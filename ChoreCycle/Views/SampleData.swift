@@ -19,11 +19,33 @@ struct SampleData: PreviewModifier {
         for chore in chores.prefix(2) {
             chore.toggleCompletion(in: container.mainContext)
         }
+
+        // A few long-cycle chores so the Monthly preview shows "Due this
+        // month" (one due now, one overdue) and a collapsed "Upcoming" list.
+        let calendar = Calendar.mondayFirst
+        let context = container.mainContext
+        let nextOrder = chores.count
+
+        context.insert(Chore(name: "Check smoke detectors", frequency: .everySixMonths,
+                             sortOrder: nextOrder, nextDueDate: .now))
+        context.insert(Chore(name: "Clean gutters", frequency: .yearly, sortOrder: nextOrder + 1,
+                             nextDueDate: calendar.date(byAdding: .month, value: -2, to: .now)))
+
+        let filter = Chore(name: "Replace furnace filter", frequency: .everySixMonths, sortOrder: nextOrder + 2)
+        context.insert(filter)
+        if let fiveMonthsAgo = calendar.date(byAdding: .month, value: -5, to: .now) {
+            filter.completions.append(Completion(completedAt: fiveMonthsAgo))
+        }
+
+        context.insert(Chore(name: "Flip mattress", frequency: .everyThreeMonths, sortOrder: nextOrder + 3,
+                             nextDueDate: calendar.date(byAdding: .month, value: 2, to: .now)))
         return container
     }
 
     func body(content: Content, context: ModelContainer) -> some View {
-        content.modelContainer(context)
+        content
+            .modelContainer(context)
+            .environment(UserSettings.preview())
     }
 }
 

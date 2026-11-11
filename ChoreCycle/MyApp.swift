@@ -6,6 +6,9 @@ import SwiftData
     /// The SwiftData database, which stores both model types on disk.
     let container: ModelContainer
 
+    /// The person's profile and preferences, backed by `UserDefaults`.
+    @State private var settings = UserSettings()
+
     init() {
         do {
             container = try ModelContainer(for: Chore.self, Completion.self)
@@ -18,10 +21,12 @@ import SwiftData
 
     var body: some Scene {
         WindowGroup {
-            ChoreListView()
+            MainTabView()
         }
         // Makes the database available to every view below it through
         // `@Query` and `@Environment(\.modelContext)`.
         .modelContainer(container)
+        // Likewise for settings, read with `@Environment(UserSettings.self)`.
+        .environment(settings)
     }
 }

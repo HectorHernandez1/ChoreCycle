@@ -10,7 +10,7 @@ struct SampleData: PreviewModifier {
     static func makeSharedContext() async throws -> ModelContainer {
         let container = try ModelContainer(
             for: Chore.self, Completion.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         )
         StarterChores.insert(into: container.mainContext)
 
@@ -34,7 +34,7 @@ struct SampleData: PreviewModifier {
         let filter = Chore(name: "Replace furnace filter", frequency: .everySixMonths, sortOrder: nextOrder + 2)
         context.insert(filter)
         if let fiveMonthsAgo = calendar.date(byAdding: .month, value: -5, to: .now) {
-            filter.completions.append(Completion(completedAt: fiveMonthsAgo))
+            filter.addCompletion(at: fiveMonthsAgo)
         }
 
         context.insert(Chore(name: "Flip mattress", frequency: .everyThreeMonths, sortOrder: nextOrder + 3,

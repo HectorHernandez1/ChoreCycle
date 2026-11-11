@@ -40,7 +40,7 @@ struct ChoreEditorSheet: View {
     /// been checked off. Once there's a completion, the due date comes from
     /// it instead.
     private var showsNextDueDate: Bool {
-        !frequency.isCalendarAligned && (chore?.completions.isEmpty ?? true)
+        !frequency.isCalendarAligned && (chore?.allCompletions.isEmpty ?? true)
     }
 
     private var frequencyFooter: String {

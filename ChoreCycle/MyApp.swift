@@ -19,13 +19,25 @@ import SwiftData
                 // two containers for the same models exist in one process,
                 // so instead of opening the real database the app creates a
                 // throwaway in-memory one and shares it with the tests.
+                // `cloudKitDatabase: .none` keeps tests away from iCloud.
                 container = try ModelContainer(
                     for: Chore.self, Completion.self,
-                    configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+                    configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
                 )
                 MyApp.testContainer = container
             } else {
-                container = try ModelContainer(for: Chore.self, Completion.self)
+                // Syncs chores and completions through the person's private
+                // iCloud database, so every device signed in to the same
+                // Apple Account sees the same checklist. If they're signed
+                // out of iCloud, SwiftData quietly keeps everything local
+                // and starts syncing once they sign in.
+                let configuration = ModelConfiguration(
+                    cloudKitDatabase: .private("iCloud.com.hectorhernandezpersonalteam.ChoreCycle")
+                )
+                container = try ModelContainer(
+                    for: Chore.self, Completion.self,
+                    configurations: configuration
+                )
                 StarterChores.seedIfNeeded(into: container.mainContext)
             }
         } catch {

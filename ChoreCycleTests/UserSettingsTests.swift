@@ -88,13 +88,15 @@ extension DatabaseTests {
         @Test func seedsOnceIntoAnEmptyDatabase() throws {
             let (defaults, cleanup) = makeIsolatedDefaults()
             defer { cleanup() }
+            let (cloud, cleanupCloud) = makeIsolatedDefaults()
+            defer { cleanupCloud() }
             let context = try makeContext()
 
-            StarterChores.seedIfNeeded(into: context, defaults: defaults)
+            StarterChores.seedIfNeeded(into: context, defaults: defaults, cloud: cloud)
             let afterFirst = try context.fetchCount(FetchDescriptor<Chore>())
             #expect(afterFirst == StarterChores.weekly.count + StarterChores.monthly.count)
 
-            StarterChores.seedIfNeeded(into: context, defaults: defaults)
+            StarterChores.seedIfNeeded(into: context, defaults: defaults, cloud: cloud)
             let afterSecond = try context.fetchCount(FetchDescriptor<Chore>())
             #expect(afterSecond == afterFirst, "Seeding is a one-time event")
         }
@@ -102,16 +104,47 @@ extension DatabaseTests {
         @Test func doesNotReseedAfterTheUserDeletesEverything() throws {
             let (defaults, cleanup) = makeIsolatedDefaults()
             defer { cleanup() }
+            let (cloud, cleanupCloud) = makeIsolatedDefaults()
+            defer { cleanupCloud() }
             let context = try makeContext()
 
-            StarterChores.seedIfNeeded(into: context, defaults: defaults)
+            StarterChores.seedIfNeeded(into: context, defaults: defaults, cloud: cloud)
             for chore in try context.fetch(FetchDescriptor<Chore>()) {
                 context.delete(chore)
             }
             try context.save()
 
-            StarterChores.seedIfNeeded(into: context, defaults: defaults)
+            StarterChores.seedIfNeeded(into: context, defaults: defaults, cloud: cloud)
             #expect(try context.fetchCount(FetchDescriptor<Chore>()) == 0)
+        }
+
+        @Test func doesNotSeedOnASecondDeviceThatAlreadySeededViaICloud() throws {
+            let (defaults, cleanup) = makeIsolatedDefaults()
+            defer { cleanup() }
+            let (cloud, cleanupCloud) = makeIsolatedDefaults()
+            defer { cleanupCloud() }
+            let context = try makeContext()
+
+            // Another device already seeded and synced the flag.
+            cloud.set(true, forKey: "didSeedStarterChores")
+
+            StarterChores.seedIfNeeded(into: context, defaults: defaults, cloud: cloud)
+            #expect(try context.fetchCount(FetchDescriptor<Chore>()) == 0)
+            #expect(defaults.bool(forKey: "didSeedStarterChores"), "The flag is copied locally")
+        }
+
+        @Test func copiesALocalSeedFlagUpToICloud() throws {
+            let (defaults, cleanup) = makeIsolatedDefaults()
+            defer { cleanup() }
+            let (cloud, cleanupCloud) = makeIsolatedDefaults()
+            defer { cleanupCloud() }
+            let context = try makeContext()
+
+            // This device seeded before iCloud sync existed.
+            defaults.set(true, forKey: "didSeedStarterChores")
+
+            StarterChores.seedIfNeeded(into: context, defaults: defaults, cloud: cloud)
+            #expect(cloud.bool(forKey: "didSeedStarterChores"))
         }
 
         @Test func starterChoresAreAllCalendarAligned() throws {

@@ -8,7 +8,8 @@ import SwiftData
 /// period (see `Chore+Period.swift`). Old completions simply stop counting.
 @Model
 final class Completion {
-    var completedAt: Date
+    /// The default is only there to satisfy iCloud sync; see `Chore`.
+    var completedAt: Date = Date.now
 
     /// The chore this completion belongs to. It's optional because SwiftData
     /// relationships must be able to be empty while objects are being created

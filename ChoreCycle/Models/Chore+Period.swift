@@ -34,17 +34,29 @@ extension DateInterval {
 }
 
 extension Chore {
+    /// Every completion of this chore, treating "no list yet" as empty.
+    var allCompletions: [Completion] {
+        completions ?? []
+    }
+
+    /// Records that the chore was done at `date`. Adding to the relationship
+    /// also inserts the new `Completion` into the database and sets its
+    /// `chore` property for us.
+    func addCompletion(at date: Date) {
+        completions = allCompletions + [Completion(completedAt: date)]
+    }
+
     /// Completions that fall inside the current checklist period (week or
     /// month, depending on this chore's frequency) as of `date`.
     func completions(inPeriodContaining date: Date = .now,
                      calendar: Calendar = .mondayFirst) -> [Completion] {
         let period = frequency.period(containing: date, calendar: calendar)
-        return completions.filter { period.containsExcludingEnd($0.completedAt) }
+        return allCompletions.filter { period.containsExcludingEnd($0.completedAt) }
     }
 
     /// The most recent time this chore was checked off on or before `date`.
     func lastCompletion(asOf date: Date = .now) -> Date? {
-        completions.map(\.completedAt).filter { $0 <= date }.max()
+        allCompletions.map(\.completedAt).filter { $0 <= date }.max()
     }
 
     /// When a rolling chore (every 3 months, 6 months, yearly) is next due:
@@ -102,14 +114,12 @@ extension Chore {
         let current = completions(inPeriodContaining: date, calendar: calendar)
 
         if current.isEmpty {
-            // Appending to the relationship also inserts the new Completion
-            // into the database and sets its `chore` property for us.
-            completions.append(Completion(completedAt: date))
+            addCompletion(at: date)
         } else {
             let period = frequency.period(containing: date, calendar: calendar)
             // Remove from the array first so views update immediately, then
             // delete the objects from the database.
-            completions.removeAll { period.containsExcludingEnd($0.completedAt) }
+            completions = allCompletions.filter { !period.containsExcludingEnd($0.completedAt) }
             for completion in current {
                 context.delete(completion)
             }

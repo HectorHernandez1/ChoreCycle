@@ -126,8 +126,8 @@ extension DatabaseTests {
             chore.toggleCompletion(on: sundayNoon, in: context)
 
             #expect(chore.isDone(asOf: sundayNoon))
-            #expect(chore.completions.count == 1)
-            #expect(chore.completions.first?.completedAt == sundayNoon)
+            #expect(chore.allCompletions.count == 1)
+            #expect(chore.allCompletions.first?.completedAt == sundayNoon)
         }
 
         @Test func weeklyChoreResetsOnMonday() throws {
@@ -149,7 +149,7 @@ extension DatabaseTests {
             let nextTuesday = day(2026, 11, 10)
             chore.toggleCompletion(on: nextTuesday, in: context)
 
-            #expect(chore.completions.count == 2)
+            #expect(chore.allCompletions.count == 2)
             #expect(chore.isDone(asOf: nextTuesday))
         }
 
@@ -160,14 +160,14 @@ extension DatabaseTests {
             let lastWeek = day(2026, 11, 1)
             chore.toggleCompletion(on: lastWeek, in: context)
             chore.toggleCompletion(on: sundayNoon, in: context)
-            #expect(chore.completions.count == 2)
+            #expect(chore.allCompletions.count == 2)
 
             // Second toggle this week unchecks it.
             chore.toggleCompletion(on: sundayNoon, in: context)
 
             #expect(!chore.isDone(asOf: sundayNoon))
-            #expect(chore.completions.count == 1)
-            #expect(chore.completions.first?.completedAt == lastWeek)
+            #expect(chore.allCompletions.count == 1)
+            #expect(chore.allCompletions.first?.completedAt == lastWeek)
         }
 
         @Test func monthlyChoreResetsOnTheFirst() throws {

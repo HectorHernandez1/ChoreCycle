@@ -22,7 +22,7 @@ extension DatabaseTests {
                               createdAt: createdAt, nextDueDate: nextDueDate)
             context.insert(chore)
             if let completedOn {
-                chore.completions.append(Completion(completedAt: completedOn))
+                chore.addCompletion(at: completedOn)
             }
             return chore
         }
@@ -58,7 +58,7 @@ extension DatabaseTests {
         @Test func mostRecentCompletionWins() throws {
             let context = try makeContext()
             let chore = makeChore(completedOn: day(2025, 1, 1), in: context)
-            chore.completions.append(Completion(completedAt: day(2026, 6, 8)))
+            chore.addCompletion(at: day(2026, 6, 8))
             #expect(chore.dueDate(asOf: now) == day(2026, 12, 8))
         }
 
@@ -66,7 +66,7 @@ extension DatabaseTests {
             // Guards against a clock that was set forward and then corrected.
             let context = try makeContext()
             let chore = makeChore(completedOn: day(2026, 6, 8), in: context)
-            chore.completions.append(Completion(completedAt: day(2027, 3, 1)))
+            chore.addCompletion(at: day(2027, 3, 1))
             #expect(chore.lastCompletion(asOf: now) == day(2026, 6, 8))
         }
 
@@ -146,7 +146,7 @@ extension DatabaseTests {
             #expect(!chore.isOverdue(asOf: now))
             #expect(chore.dueDate(asOf: now) == day(2027, 5, 8, hour: 12))
             #expect(chore.isDue(inMonthContaining: now), "Stays visible as done until the month ends")
-            #expect(chore.completions.count == 2)
+            #expect(chore.allCompletions.count == 2)
         }
 
         @Test func uncheckingRestoresThePreviousCycle() throws {
@@ -159,7 +159,7 @@ extension DatabaseTests {
             #expect(!chore.isDone(asOf: now))
             #expect(chore.isOverdue(asOf: now))
             #expect(chore.dueDate(asOf: now) == day(2026, 10, 8))
-            #expect(chore.completions.count == 1, "The April completion is untouched")
+            #expect(chore.allCompletions.count == 1, "The April completion is untouched")
         }
 
         @Test func checkingEarlyMovesItIntoThisMonth() throws {

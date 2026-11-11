@@ -1,8 +1,8 @@
 import SwiftUI
 import SwiftData
 
-/// The app's root screen: a tab bar with weekly chores, monthly chores, and
-/// the person's profile.
+/// The app's root screen: a tab bar with weekly chores, monthly chores,
+/// history, and the person's profile.
 struct MainTabView: View {
     @Environment(UserSettings.self) private var settings
     @Environment(\.modelContext) private var modelContext
@@ -15,6 +15,9 @@ struct MainTabView: View {
             }
             Tab("Monthly", systemImage: "calendar") {
                 ChoreListView(frequency: .monthly)
+            }
+            Tab("History", systemImage: "clock.arrow.circlepath") {
+                HistoryView()
             }
             Tab("Profile", systemImage: "person.crop.circle") {
                 ProfileView()

@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AppIntents
 
 /// The app's root screen: a tab bar with weekly chores, monthly chores,
 /// history, and the person's profile.
@@ -30,13 +31,19 @@ struct MainTabView: View {
         // Re-schedule due-date reminders whenever the app comes to the
         // front, so they stay right even if a due date passed while the app
         // was closed or the person changed notification permission.
+        //
+        // Same moment for refreshing the chore names Siri listens for in
+        // phrases like "Mark Vacuum done", since chores may have been added
+        // or renamed (here or on another device).
         .task {
             await ChoreReminders.sync(in: modelContext, enabled: settings.remindersEnabled)
+            ChoreCycleShortcuts.updateAppShortcutParameters()
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard newPhase == .active else { return }
             Task {
                 await ChoreReminders.sync(in: modelContext, enabled: settings.remindersEnabled)
+                ChoreCycleShortcuts.updateAppShortcutParameters()
             }
         }
     }

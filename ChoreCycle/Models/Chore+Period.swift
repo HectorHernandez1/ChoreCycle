@@ -104,6 +104,21 @@ extension Chore {
         return due < month.end
     }
 
+    /// The chores that make up a checklist (the ones its progress ring
+    /// counts): weekly chores for `.weekly`; for `.monthly`, monthly chores
+    /// plus any long-cycle chores due this month.
+    static func checklist(for frequency: Frequency,
+                          from chores: [Chore],
+                          asOf date: Date = .now,
+                          calendar: Calendar = .mondayFirst) -> [Chore] {
+        let regular = chores.filter { $0.frequency == frequency }
+        guard frequency == .monthly else { return regular }
+        let dueThisMonth = chores.filter {
+            !$0.frequency.isCalendarAligned && $0.isDue(inMonthContaining: date, calendar: calendar)
+        }
+        return regular + dueThisMonth
+    }
+
     /// Checks the chore off (adds a `Completion` dated `date`) or, if it's
     /// already been checked this period, unchecks it by deleting this
     /// period's completions. Completions from earlier periods are left

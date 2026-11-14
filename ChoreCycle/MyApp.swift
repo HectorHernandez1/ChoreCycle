@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AppIntents
 
 /// `@main` marks the app's entry point, like `if __name__ == "__main__"`.
 @main struct MyApp: App {
@@ -39,11 +40,18 @@ import SwiftData
                     configurations: configuration
                 )
                 StarterChores.seedIfNeeded(into: container.mainContext)
+                Chore.assignMissingIDs(in: container.mainContext)
             }
         } catch {
             // Without a database the app can't do anything useful.
             fatalError("Could not create the SwiftData container: \(error)")
         }
+
+        // Siri and Shortcuts can launch the app in the background just to
+        // run an intent, so the database they use (`@Dependency` in
+        // `ChoreIntents.swift`) has to be registered before anything else.
+        let container = container
+        AppDependencyManager.shared.add(dependency: container)
     }
 
     var body: some Scene {

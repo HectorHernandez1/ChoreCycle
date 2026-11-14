@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AppIntents
 
 /// A sheet for adding a new chore, or editing an existing one.
 struct ChoreEditorSheet: View {
@@ -161,6 +162,8 @@ struct ChoreEditorSheet: View {
                 await ChoreReminders.sync(in: context, enabled: enabled)
             }
         }
+        // Teach Siri the new or changed name for "Mark … done".
+        ChoreCycleShortcuts.updateAppShortcutParameters()
         dismiss()
     }
 

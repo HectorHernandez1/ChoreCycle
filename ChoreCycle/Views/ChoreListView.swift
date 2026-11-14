@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AppIntents
 
 /// A checklist screen for a single frequency: either this week's chores or
 /// this month's chores. `MainTabView` shows one of these per tab.
@@ -361,6 +362,14 @@ struct ChoreListView: View {
 
         // Unchecking a chore is not a celebration.
         guard !wasDone else { return }
+
+        // Tell the system this happened, so Siri and Spotlight can start
+        // suggesting "Mark Vacuum done" around the times it usually happens.
+        if let entity = ChoreEntity(chore) {
+            Task {
+                _ = try? await CompleteChoreIntent(chore: entity).donate()
+            }
+        }
 
         // The relationship was updated synchronously above, so this already
         // reflects the chore that was just checked off. Only chores in this

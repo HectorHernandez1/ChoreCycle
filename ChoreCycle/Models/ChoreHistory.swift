@@ -18,7 +18,7 @@ struct PeriodSummary: Identifiable {
 }
 
 /// A current streak and the best one on record, counted in weeks or months.
-struct Streak: Equatable {
+nonisolated struct Streak: Equatable {
     var current: Int
     var best: Int
 }

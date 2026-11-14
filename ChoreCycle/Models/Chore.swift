@@ -28,6 +28,18 @@ final class Chore {
     /// without a migration step.
     var nextDueDate: Date?
 
+    /// A permanent ID that Siri and Shortcuts use to refer to this chore.
+    ///
+    /// SwiftData's own `persistentModelID` differs from device to device
+    /// under iCloud sync, so saved shortcuts couldn't rely on it. This UUID
+    /// syncs like any other field.
+    ///
+    /// It's optional because chores saved before this field existed don't
+    /// have one. A non-optional default would hand every one of them the
+    /// *same* UUID during the upgrade, so instead `assignMissingIDs(in:)`
+    /// fills them in at launch.
+    var choreID: UUID?
+
     /// Every time this chore was checked off, across all weeks and months.
     ///
     /// `@Relationship` tells SwiftData this is a link to other models rather
@@ -45,12 +57,27 @@ final class Chore {
          frequency: Frequency,
          sortOrder: Int,
          createdAt: Date = .now,
-         nextDueDate: Date? = nil) {
+         nextDueDate: Date? = nil,
+         choreID: UUID = UUID()) {
         self.name = name
         self.frequency = frequency
         self.sortOrder = sortOrder
         self.createdAt = createdAt
         self.nextDueDate = nextDueDate
+        self.choreID = choreID
+    }
+}
+
+extension Chore {
+    /// Gives a `choreID` to any chore that doesn't have one yet (chores
+    /// from before the field existed, or synced from an older version).
+    static func assignMissingIDs(in context: ModelContext) {
+        let missing = FetchDescriptor<Chore>(predicate: #Predicate { $0.choreID == nil })
+        guard let chores = try? context.fetch(missing), !chores.isEmpty else { return }
+        for chore in chores {
+            chore.choreID = UUID()
+        }
+        try? context.save()
     }
 }
 

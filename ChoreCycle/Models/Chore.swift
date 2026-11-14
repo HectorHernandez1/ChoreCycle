@@ -53,3 +53,29 @@ final class Chore {
         self.nextDueDate = nextDueDate
     }
 }
+
+extension Chore {
+    /// Applies a drag-to-reorder within one section of the list.
+    ///
+    /// `sortOrder` is shared by every chore in the app, not just one
+    /// section, so rather than renumbering from zero (which could collide
+    /// with chores in other tabs) the section's existing `sortOrder` values
+    /// are handed back out in the new order.
+    static func reorder(_ chores: [Chore], fromOffsets source: IndexSet, toOffset destination: Int) {
+        let slots = chores.map(\.sortOrder).sorted()
+
+        // Same rules as SwiftUI's `move(fromOffsets:toOffset:)`: pull out
+        // the dragged rows, then drop them where `destination` pointed
+        // before they were removed.
+        let moved = source.map { chores[$0] }
+        var reordered = chores.enumerated()
+            .filter { !source.contains($0.offset) }
+            .map(\.element)
+        let insertAt = destination - source.count(in: 0..<destination)
+        reordered.insert(contentsOf: moved, at: insertAt)
+
+        for (chore, slot) in zip(reordered, slots) where chore.sortOrder != slot {
+            chore.sortOrder = slot
+        }
+    }
+}

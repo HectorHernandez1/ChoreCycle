@@ -109,7 +109,7 @@ struct ChoreListView: View {
 
                 if !regular.isEmpty {
                     Section {
-                        choreRows(regular)
+                        choreRows(regular, canReorder: true)
                     } header: {
                         Text("Chores")
                     }
@@ -158,6 +158,16 @@ struct ChoreListView: View {
             .animation(.snappy, value: isUpcomingExpanded)
             .navigationTitle(title)
             .toolbar {
+                // Edit mode shows drag handles, which is easier than press-
+                // and-drag for some people and works well with VoiceOver.
+                // (Edit mode doesn't exist on the Mac, where rows drag directly.)
+                #if !os(macOS)
+                if regular.count > 1 {
+                    ToolbarItem(placement: .topBarLeading) {
+                        EditButton()
+                    }
+                }
+                #endif
                 ToolbarItem(placement: .primaryAction) {
                     Button("Add Chore", systemImage: "plus") {
                         isAddingChore = true
@@ -183,9 +193,13 @@ struct ChoreListView: View {
         }
     }
 
-    /// The rows for one section, with swipe-to-delete.
+    /// The rows for one section, with swipe-to-delete and, where the order
+    /// is the person's to choose, drag-to-reorder.
+    ///
+    /// Long-cycle sections are always sorted by due date, so they pass
+    /// `canReorder: false`.
     @ViewBuilder
-    private func choreRows(_ sectionChores: [Chore]) -> some View {
+    private func choreRows(_ sectionChores: [Chore], canReorder: Bool = false) -> some View {
         ForEach(sectionChores) { chore in
             ChoreRowView(
                 chore: chore,
@@ -203,6 +217,11 @@ struct ChoreListView: View {
             }
             refreshReminders()
         }
+        // `.onMove` lets rows be dragged (press and hold, then drag, or use
+        // the handles in Edit mode). Passing `nil` turns it off.
+        .onMove(perform: canReorder ? { source, destination in
+            Chore.reorder(sectionChores, fromOffsets: source, toOffset: destination)
+        } : nil)
     }
 
     /// Re-schedules due-date reminders after anything that could move one.

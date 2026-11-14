@@ -195,4 +195,40 @@ extension DatabaseTests {
             #expect(remaining.isEmpty)
         }
     }
+
+    @MainActor
+    struct ReorderTests {
+        @Test func movingAChoreReusesTheSectionsSortOrders() throws {
+            let context = try makeContext()
+            // Gaps in the numbers stand in for chores in other tabs.
+            let trash = Chore(name: "Trash", frequency: .weekly, sortOrder: 0)
+            let laundry = Chore(name: "Laundry", frequency: .weekly, sortOrder: 3)
+            let vacuum = Chore(name: "Vacuum", frequency: .weekly, sortOrder: 7)
+            let bills = Chore(name: "Bills", frequency: .monthly, sortOrder: 5)
+            for chore in [trash, laundry, vacuum, bills] {
+                context.insert(chore)
+            }
+
+            // Drag Vacuum to the top.
+            Chore.reorder([trash, laundry, vacuum], fromOffsets: [2], toOffset: 0)
+
+            #expect(vacuum.sortOrder == 0)
+            #expect(trash.sortOrder == 3)
+            #expect(laundry.sortOrder == 7)
+            #expect(bills.sortOrder == 5, "Chores in other sections are untouched")
+        }
+
+        @Test func movingDownTheList() throws {
+            let context = try makeContext()
+            let chores = (0..<4).map { Chore(name: "Chore \($0)", frequency: .weekly, sortOrder: $0) }
+            chores.forEach(context.insert)
+
+            // `toOffset` counts positions before the move, so 3 lands it
+            // just above the last chore.
+            Chore.reorder(chores, fromOffsets: [0], toOffset: 3)
+
+            let order = chores.sorted { $0.sortOrder < $1.sortOrder }.map(\.name)
+            #expect(order == ["Chore 1", "Chore 2", "Chore 0", "Chore 3"])
+        }
+    }
 }

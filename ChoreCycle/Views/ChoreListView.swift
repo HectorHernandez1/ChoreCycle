@@ -123,6 +123,12 @@ struct ChoreListView: View {
                     )
                 }
 
+                if showsSiriTip {
+                    Section {
+                        siriTip
+                    }
+                }
+
                 if !regular.isEmpty {
                     Section {
                         choreRows(regular, canReorder: true)
@@ -273,6 +279,28 @@ struct ChoreListView: View {
         .onMove(perform: canReorder ? { source, destination in
             Chore.reorder(sectionChores, fromOffsets: source, toOffset: destination)
         } : nil)
+    }
+
+    /// The Siri tip appears once, on the Weekly tab, and only when there are
+    /// chores for "What's left" to talk about.
+    private var showsSiriTip: Bool {
+        #if os(iOS)
+        frequency == .weekly && settings.showsSiriTip && !chores.isEmpty
+        #else
+        false
+        #endif
+    }
+
+    /// "Try saying 'What's left in ChoreCycle'", with a close button that
+    /// turns the tip off for good (Profile can bring it back).
+    @ViewBuilder
+    private var siriTip: some View {
+        #if os(iOS)
+        @Bindable var settings = settings
+        SiriTipView(intent: ChoresLeftIntent(), isVisible: $settings.showsSiriTip)
+            .listRowInsets(EdgeInsets())
+            .listRowBackground(Color.clear)
+        #endif
     }
 
     /// Deletes chores (and their history), keeping a copy so the Undo

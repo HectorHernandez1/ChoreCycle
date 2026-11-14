@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AppIntents
 
 /// The Profile tab: the person's name plus the look-and-feel settings.
 /// Everything here is saved automatically through `UserSettings`.
@@ -63,6 +64,20 @@ struct ProfileView: View {
                 } footer: {
                     Text("A small burst when you finish a chore, and a big one when the whole week or month is done.")
                 }
+
+                #if os(iOS)
+                Section {
+                    Toggle("Show Siri Tip", isOn: $settings.showsSiriTip)
+                    // Opens ChoreCycle's page in the Shortcuts app, where
+                    // all of its Siri phrases and actions are listed.
+                    ShortcutsLink()
+                        .frame(maxWidth: .infinity)
+                } header: {
+                    Text("Siri & Shortcuts")
+                } footer: {
+                    Text("Try “What’s left in ChoreCycle?” or “Mark Vacuum done in ChoreCycle.”")
+                }
+                #endif
 
                 Section {
                     Toggle("Due Date Reminders", isOn: $settings.remindersEnabled)

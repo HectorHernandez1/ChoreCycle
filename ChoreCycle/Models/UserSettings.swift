@@ -88,6 +88,7 @@ final class UserSettings {
         static let appearance = "appearance"
         static let celebrationsEnabled = "celebrationsEnabled"
         static let remindersEnabled = "remindersEnabled"
+        static let showsSiriTip = "showsSiriTip"
     }
 
     var displayName: String {
@@ -111,6 +112,12 @@ final class UserSettings {
         didSet { defaults.set(remindersEnabled, forKey: Key.remindersEnabled) }
     }
 
+    /// Whether the Weekly tab shows the "Try saying…" Siri tip. Closing the
+    /// tip turns this off; the Profile tab can turn it back on.
+    var showsSiriTip: Bool {
+        didSet { defaults.set(showsSiriTip, forKey: Key.showsSiriTip) }
+    }
+
     /// Up to two initials from the display name, e.g. "Hector Hernandez"
     /// becomes "HH". Empty when no name is set.
     var initials: String {
@@ -131,6 +138,7 @@ final class UserSettings {
         // default new installs to on.
         celebrationsEnabled = defaults.object(forKey: Key.celebrationsEnabled) as? Bool ?? true
         remindersEnabled = defaults.object(forKey: Key.remindersEnabled) as? Bool ?? true
+        showsSiriTip = defaults.object(forKey: Key.showsSiriTip) as? Bool ?? true
     }
 
     /// Settings backed by a throwaway store, so previews never read or

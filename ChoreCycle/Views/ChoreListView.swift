@@ -45,6 +45,17 @@ struct ChoreListView: View {
     @State private var choreBeingEdited: Chore?
     @State private var isUpcomingExpanded = false
 
+    /// The chores removed by the most recent delete, kept while the Undo
+    /// banner is showing. A new delete replaces it, making the older one
+    /// permanent.
+    @State private var pendingUndo: PendingUndo?
+
+    /// VoiceOver users get as long as they need to reach the Undo button.
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+
+    /// How long the Undo banner stays up on its own.
+    private static let undoTimeout: Duration = .seconds(6)
+
     /// Confetti currently falling. Bursts remove themselves when finished.
     @State private var bursts: [ConfettiBurst] = []
 
@@ -150,6 +161,27 @@ struct ChoreListView: View {
                 ConfettiOverlay(bursts: bursts, accent: settings.accentTheme.color)
                     .ignoresSafeArea()
             }
+            // `safeAreaInset` floats the banner above the tab bar and lets
+            // the list scroll its last rows clear of it.
+            .safeAreaInset(edge: .bottom) {
+                if let pendingUndo {
+                    UndoBanner(message: pendingUndo.message,
+                               onUndo: undoDelete,
+                               onDismiss: { withAnimation(.snappy) { self.pendingUndo = nil } })
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            // Restarts whenever a new delete happens; `id` changing cancels
+            // the previous countdown.
+            .task(id: pendingUndo?.id) {
+                guard pendingUndo != nil, !voiceOverEnabled else { return }
+                do {
+                    try await Task.sleep(for: Self.undoTimeout)
+                } catch {
+                    return // Cancelled by a newer delete or an undo.
+                }
+                withAnimation(.snappy) { pendingUndo = nil }
+            }
             .sensoryFeedback(trigger: celebrationCount) { _, _ in
                 lastCelebrationWasBig ? .success : .impact(weight: .light)
             }
@@ -212,16 +244,40 @@ struct ChoreListView: View {
         }
         // `.onDelete` adds the standard swipe-left-to-delete gesture.
         .onDelete { offsets in
-            for index in offsets {
-                modelContext.delete(sectionChores[index])
-            }
-            refreshReminders()
+            delete(offsets.map { sectionChores[$0] })
         }
         // `.onMove` lets rows be dragged (press and hold, then drag, or use
         // the handles in Edit mode). Passing `nil` turns it off.
         .onMove(perform: canReorder ? { source, destination in
             Chore.reorder(sectionChores, fromOffsets: source, toOffset: destination)
         } : nil)
+    }
+
+    /// Deletes chores (and their history), keeping a copy so the Undo
+    /// banner can put them back.
+    private func delete(_ removed: [Chore]) {
+        guard !removed.isEmpty else { return }
+        let undo = PendingUndo(chores: removed.map(DeletedChore.init))
+        withAnimation(.snappy) {
+            pendingUndo = undo
+        }
+        for chore in removed {
+            modelContext.delete(chore)
+        }
+        refreshReminders()
+        // The banner appearing isn't announced on its own.
+        AccessibilityNotification.Announcement("\(undo.message). Undo available.").post()
+    }
+
+    private func undoDelete() {
+        guard let pendingUndo else { return }
+        withAnimation(.snappy) {
+            for deleted in pendingUndo.chores {
+                deleted.restore(into: modelContext)
+            }
+            self.pendingUndo = nil
+        }
+        refreshReminders()
     }
 
     /// Re-schedules due-date reminders after anything that could move one.
@@ -335,6 +391,19 @@ struct ChoreListView: View {
                 bursts.removeAll { $0.id == burst.id }
             }
         }
+    }
+}
+
+/// What the Undo banner can bring back.
+private struct PendingUndo: Identifiable {
+    let id = UUID()
+    let chores: [DeletedChore]
+
+    var message: String {
+        if chores.count == 1, let chore = chores.first {
+            return "Deleted “\(chore.name)”"
+        }
+        return "Deleted \(chores.count) chores"
     }
 }
 

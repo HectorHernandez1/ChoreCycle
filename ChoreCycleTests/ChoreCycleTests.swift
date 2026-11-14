@@ -231,4 +231,35 @@ extension DatabaseTests {
             #expect(order == ["Chore 1", "Chore 2", "Chore 0", "Chore 3"])
         }
     }
+
+    @MainActor
+    struct UndoDeleteTests {
+        @Test func restoringADeletedChoreBringsBackItsHistory() throws {
+            let context = try makeContext()
+            let created = day(2026, 1, 1)
+            let chore = Chore(name: "Furnace filter", frequency: .everySixMonths, sortOrder: 4,
+                              createdAt: created, nextDueDate: day(2026, 3, 1))
+            context.insert(chore)
+            chore.addCompletion(at: day(2026, 5, 1))
+            chore.addCompletion(at: day(2026, 11, 2))
+            try context.save()
+
+            let snapshot = DeletedChore(chore)
+            context.delete(chore)
+            try context.save()
+            #expect(try context.fetchCount(FetchDescriptor<Completion>()) == 0)
+
+            snapshot.restore(into: context)
+            try context.save()
+
+            let restored = try #require(try context.fetch(FetchDescriptor<Chore>()).first)
+            #expect(restored.name == "Furnace filter")
+            #expect(restored.frequency == .everySixMonths)
+            #expect(restored.sortOrder == 4)
+            #expect(restored.createdAt == created)
+            #expect(restored.nextDueDate == day(2026, 3, 1))
+            #expect(Set(restored.allCompletions.map(\.completedAt)) == [day(2026, 5, 1), day(2026, 11, 2)])
+            #expect(restored.dueDate(asOf: sundayNoon) == day(2027, 5, 2))
+        }
+    }
 }

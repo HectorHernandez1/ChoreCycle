@@ -15,7 +15,8 @@ struct DeletedChore {
     let nextDueDate: Date?
     let dueWeekday: Int?
     let notes: String
-    let completionDates: [Date]
+    /// Each check-off's date, and whether it was a skip.
+    let completions: [(date: Date, isSkip: Bool)]
     /// Kept so Siri shortcuts that point at this chore keep working after Undo.
     let choreID: UUID?
 
@@ -28,7 +29,7 @@ struct DeletedChore {
         nextDueDate = chore.nextDueDate
         dueWeekday = chore.dueWeekday
         notes = chore.notes
-        completionDates = chore.allCompletions.map(\.completedAt)
+        completions = chore.allCompletions.map { ($0.completedAt, $0.isSkip) }
     }
 
     /// Inserts a new chore with the saved values and completions.
@@ -43,8 +44,8 @@ struct DeletedChore {
                           notes: notes,
                           choreID: choreID ?? UUID())
         context.insert(chore)
-        for date in completionDates {
-            chore.addCompletion(at: date)
+        for completion in completions {
+            chore.addCompletion(at: completion.date, isSkip: completion.isSkip)
         }
         return chore
     }

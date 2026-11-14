@@ -4,7 +4,8 @@ import SwiftData
 /// How one week or month went for chores of a single frequency.
 struct PeriodSummary: Identifiable {
     let period: DateInterval
-    /// Chores of this frequency that existed at some point during the period.
+    /// Chores of this frequency that existed at some point during the
+    /// period, leaving out any that were skipped.
     let scheduledCount: Int
     /// How many of those were checked off inside the period.
     let doneCount: Int
@@ -29,6 +30,8 @@ struct HistoryEntry: Identifiable {
     let choreName: String
     let frequency: Frequency
     let completedAt: Date
+    /// Skipped rather than done.
+    let isSkip: Bool
 }
 
 /// One week's worth of check-offs, newest first.
@@ -53,7 +56,8 @@ enum ChoreHistory {
     ///
     /// A chore counts toward a period if it was created before the period
     /// ended, matching the checklist, where a chore added mid-week shows up
-    /// in that week's list straight away.
+    /// in that week's list straight away. Chores skipped that period don't
+    /// count at all.
     static func summaries(of chores: [Chore],
                           frequency: Frequency,
                           asOf now: Date = .now,
@@ -67,7 +71,9 @@ enum ChoreHistory {
         let current = frequency.period(containing: now, calendar: calendar)
 
         while period.start <= current.start {
-            let scheduled = matching.filter { $0.createdAt < period.end }
+            let scheduled = matching.filter {
+                $0.createdAt < period.end && !$0.isSkipped(asOf: period.start, calendar: calendar)
+            }
             let done = scheduled.filter { $0.isDone(asOf: period.start, calendar: calendar) }
             summaries.append(PeriodSummary(period: period,
                                            scheduledCount: scheduled.count,
@@ -80,12 +86,16 @@ enum ChoreHistory {
 
     /// Consecutive complete periods. The last summary is the period still
     /// in progress: finishing it extends the streak, but not having
-    /// finished it yet doesn't break the streak.
+    /// finished it yet doesn't break the streak. A period where every chore
+    /// was skipped (nothing scheduled) is neutral: it neither breaks nor
+    /// extends the streak, so a week away doesn't cost anything.
     static func streak(from summaries: [PeriodSummary]) -> Streak {
         var run = 0
         var best = 0
         for (index, summary) in summaries.enumerated() {
-            if summary.isComplete {
+            if summary.scheduledCount == 0 {
+                continue
+            } else if summary.isComplete {
                 run += 1
                 best = max(best, run)
             } else if index != summaries.count - 1 {
@@ -95,8 +105,9 @@ enum ChoreHistory {
         return Streak(current: run, best: best)
     }
 
-    /// Every check-off on or before `now`, grouped into Monday-first weeks,
-    /// newest week first. Weeks with nothing checked off are left out.
+    /// Every check-off and skip on or before `now`, grouped into
+    /// Monday-first weeks, newest week first. Weeks with nothing in them are
+    /// left out.
     static func weeks(of chores: [Chore],
                       asOf now: Date = .now,
                       calendar: Calendar = .mondayFirst) -> [HistoryWeek] {
@@ -106,7 +117,8 @@ enum ChoreHistory {
                 .map { HistoryEntry(id: $0.persistentModelID,
                                     choreName: chore.name,
                                     frequency: chore.frequency,
-                                    completedAt: $0.completedAt) }
+                                    completedAt: $0.completedAt,
+                                    isSkip: $0.isSkip) }
         }
 
         // `Dictionary(grouping:by:)` buckets entries by the start of their week.

@@ -55,24 +55,33 @@ extension Chore {
         completions ?? []
     }
 
-    /// Records that the chore was done at `date`. Adding to the relationship
-    /// also inserts the new `Completion` into the database and sets its
-    /// `chore` property for us.
-    func addCompletion(at date: Date) {
-        completions = allCompletions + [Completion(completedAt: date)]
+    /// Records that the chore was done (or, with `isSkip`, skipped) at
+    /// `date`. Adding to the relationship also inserts the new `Completion`
+    /// into the database and sets its `chore` property for us.
+    func addCompletion(at date: Date, isSkip: Bool = false) {
+        completions = allCompletions + [Completion(completedAt: date, isSkip: isSkip)]
     }
 
-    /// Completions that fall inside the current checklist period (week or
-    /// month, depending on this chore's frequency) as of `date`.
+    /// Completions (done or skipped) that fall inside the current checklist
+    /// period (week or month, depending on this chore's frequency) as of
+    /// `date`.
     func completions(inPeriodContaining date: Date = .now,
                      calendar: Calendar = .mondayFirst) -> [Completion] {
         let period = frequency.period(containing: date, calendar: calendar)
         return allCompletions.filter { period.containsExcludingEnd($0.completedAt) }
     }
 
-    /// The most recent time this chore was checked off on or before `date`.
+    /// The most recent check-off *or skip* on or before `date`. This drives
+    /// scheduling: skipping a long-cycle chore starts its next cycle just
+    /// like doing it would.
     func lastCompletion(asOf date: Date = .now) -> Date? {
         allCompletions.map(\.completedAt).filter { $0 <= date }.max()
+    }
+
+    /// The most recent time the chore was actually done (skips don't
+    /// count), for "Last done" labels.
+    func lastDone(asOf date: Date = .now) -> Date? {
+        allCompletions.filter { !$0.isSkip }.map(\.completedAt).filter { $0 <= date }.max()
     }
 
     /// When the chore is next due, or `nil` if it doesn't have a due date.
@@ -124,7 +133,7 @@ extension Chore {
         guard let fire = atHour(due) else { return nil }
 
         if frequency.isCalendarAligned {
-            if !isDone(asOf: now, calendar: calendar), fire > now {
+            if !isHandled(asOf: now, calendar: calendar), fire > now {
                 return fire
             }
             return calendar.date(byAdding: .weekOfYear, value: 1, to: due).flatMap(atHour)
@@ -134,22 +143,36 @@ extension Chore {
 
     /// Whether the chore has been checked off in the current checklist
     /// period: this week for weekly chores, this month for everything else.
+    /// A skip doesn't count as done.
     ///
     /// For rolling chores this deliberately ignores the due date. A chore
     /// due on the 25th should sit unchecked in this month's list until it's
     /// actually done, even though it isn't late yet.
     func isDone(asOf date: Date = .now, calendar: Calendar = .mondayFirst) -> Bool {
+        completions(inPeriodContaining: date, calendar: calendar).contains { !$0.isSkip }
+    }
+
+    /// Whether the person skipped the chore this period (and hasn't done it
+    /// after all).
+    func isSkipped(asOf date: Date = .now, calendar: Calendar = .mondayFirst) -> Bool {
+        let current = completions(inPeriodContaining: date, calendar: calendar)
+        return current.contains(where: \.isSkip) && !current.contains { !$0.isSkip }
+    }
+
+    /// Done or skipped: either way, nothing more is expected this period.
+    func isHandled(asOf date: Date = .now, calendar: Calendar = .mondayFirst) -> Bool {
         !completions(inPeriodContaining: date, calendar: calendar).isEmpty
     }
 
     /// Whether the chore is overdue: its due date is before today and it
-    /// hasn't been checked off since. A chore due today is not overdue.
+    /// hasn't been checked off (or skipped) since. A chore due today is not
+    /// overdue.
     ///
     /// Rolling chores get a new due date as soon as they're checked off, so
-    /// only weekly chores need the explicit "done this week" check.
+    /// only weekly chores need the explicit "handled this week" check.
     func isOverdue(asOf date: Date = .now, calendar: Calendar = .mondayFirst) -> Bool {
         guard let due = dueDate(asOf: date, calendar: calendar) else { return false }
-        if frequency.isCalendarAligned && isDone(asOf: date, calendar: calendar) {
+        if frequency.isCalendarAligned && isHandled(asOf: date, calendar: calendar) {
             return false
         }
         return due < calendar.startOfDay(for: date)
@@ -158,12 +181,12 @@ extension Chore {
     /// Whether a rolling chore belongs in the checklist for the period
     /// containing `date` (the week for every 2 weeks, the month for the
     /// rest): either it's due (or overdue) by the end of that period, or it
-    /// was checked off during it and should stay visible as done until the
-    /// period ends.
+    /// was checked off or skipped during it and should stay visible until
+    /// the period ends.
     func isDue(inPeriodContaining date: Date = .now, calendar: Calendar = .mondayFirst) -> Bool {
         guard !frequency.isCalendarAligned,
               let due = dueDate(asOf: date, calendar: calendar) else { return false }
-        if isDone(asOf: date, calendar: calendar) {
+        if isHandled(asOf: date, calendar: calendar) {
             return true
         }
         return due < frequency.period(containing: date, calendar: calendar).end
@@ -186,24 +209,51 @@ extension Chore {
     }
 
     /// Checks the chore off (adds a `Completion` dated `date`) or, if it's
-    /// already been checked this period, unchecks it by deleting this
-    /// period's completions. Completions from earlier periods are left
+    /// already been checked or skipped this period, clears that by deleting
+    /// this period's completions. Completions from earlier periods are left
     /// untouched, so unchecking a rolling chore restores its previous cycle.
     func toggleCompletion(on date: Date = .now,
                           in context: ModelContext,
                           calendar: Calendar = .mondayFirst) {
-        let current = completions(inPeriodContaining: date, calendar: calendar)
-
-        if current.isEmpty {
-            addCompletion(at: date)
+        if isHandled(asOf: date, calendar: calendar) {
+            clearCurrentPeriod(on: date, in: context, calendar: calendar)
         } else {
-            let period = frequency.period(containing: date, calendar: calendar)
-            // Remove from the array first so views update immediately, then
-            // delete the objects from the database.
-            completions = allCompletions.filter { !period.containsExcludingEnd($0.completedAt) }
-            for completion in current {
-                context.delete(completion)
-            }
+            addCompletion(at: date)
+        }
+    }
+
+    /// Skips the chore for the current period, replacing a check-off if
+    /// there was one.
+    func skip(on date: Date = .now,
+              in context: ModelContext,
+              calendar: Calendar = .mondayFirst) {
+        clearCurrentPeriod(on: date, in: context, calendar: calendar)
+        addCompletion(at: date, isSkip: true)
+    }
+
+    /// Checks the chore off unless it's already done this period, turning a
+    /// skip into a check-off. Returns whether anything changed. Used by Siri
+    /// and the reminder's "Mark Done" button, which should never *un*check.
+    @discardableResult
+    func markDone(on date: Date = .now,
+                  in context: ModelContext,
+                  calendar: Calendar = .mondayFirst) -> Bool {
+        guard !isDone(asOf: date, calendar: calendar) else { return false }
+        clearCurrentPeriod(on: date, in: context, calendar: calendar)
+        addCompletion(at: date)
+        return true
+    }
+
+    /// Deletes this period's completions and skips.
+    private func clearCurrentPeriod(on date: Date, in context: ModelContext, calendar: Calendar) {
+        let current = completions(inPeriodContaining: date, calendar: calendar)
+        guard !current.isEmpty else { return }
+        let period = frequency.period(containing: date, calendar: calendar)
+        // Remove from the array first so views update immediately, then
+        // delete the objects from the database.
+        completions = allCompletions.filter { !period.containsExcludingEnd($0.completedAt) }
+        for completion in current {
+            context.delete(completion)
         }
     }
 }

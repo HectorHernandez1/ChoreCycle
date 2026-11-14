@@ -5,6 +5,8 @@ import SwiftUI
 struct ChoreRowView: View {
     let chore: Chore
     let isDone: Bool
+    /// Skipped this period: shown dimmed with a skip symbol, not struck out.
+    var isSkipped: Bool = false
     /// Optional line under the name, e.g. "Due Nov 20" for long-cycle chores.
     var detail: String? = nil
     /// Tints the detail line to draw attention to an overdue chore.
@@ -13,6 +15,15 @@ struct ChoreRowView: View {
     /// coordinate space) so confetti can burst from the right spot.
     let onToggle: (CGPoint) -> Void
     let onEdit: () -> Void
+    /// "Skip This Week", "Don't Skip", etc., with its action. `nil` hides
+    /// the menu item (for example, when the chore is already done).
+    var skipAction: (title: String, perform: () -> Void)? = nil
+
+    private var accessibilityState: String {
+        if isDone { return "Done" }
+        if isSkipped { return "Skipped" }
+        return "Not done"
+    }
 
     /// Where the check circle currently sits on screen, kept up to date as
     /// the list scrolls.
@@ -35,7 +46,7 @@ struct ChoreRowView: View {
                         Text(chore.name)
                             .font(.body.weight(.medium))
                             .strikethrough(isDone, color: .secondary)
-                            .foregroundStyle(isDone ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                            .foregroundStyle(isDone || isSkipped ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
                             .lineLimit(2)
 
                         if let detail {
@@ -63,7 +74,7 @@ struct ChoreRowView: View {
             // `.plain` stops the whole row from flashing like a big button
             // and keeps the text its normal color.
             .buttonStyle(.plain)
-            .accessibilityValue(isDone ? "Done" : "Not done")
+            .accessibilityValue(accessibilityState)
 
             // `.borderless` lets this button receive its own taps inside a
             // List row instead of the row treating every tap as one button.
@@ -77,21 +88,37 @@ struct ChoreRowView: View {
         }
         .padding(.vertical, 4)
         .animation(.snappy(duration: 0.3), value: isDone)
+        .animation(.snappy(duration: 0.3), value: isSkipped)
         // Long-pressing the row shows this menu.
         .contextMenu {
             Button("Edit", systemImage: "pencil", action: onEdit)
+            if let skipAction {
+                Button(skipAction.title,
+                       systemImage: isSkipped ? "arrow.uturn.backward" : "forward.end",
+                       action: skipAction.perform)
+            }
+        }
+        // VoiceOver users reach Skip from the Actions rotor too.
+        .accessibilityActions {
+            if let skipAction {
+                Button(skipAction.title, action: skipAction.perform)
+            }
         }
     }
 
-    /// A filled accent circle when done, an outlined ring when not. The
-    /// symbol swap animates with a small bounce.
+    /// A filled accent circle when done, a dashed ring with a skip symbol
+    /// when skipped, an outlined ring otherwise. The symbol swap animates
+    /// with a small bounce.
     private var checkCircle: some View {
         ZStack {
             Circle()
                 .fill(isDone ? AnyShapeStyle(.tint) : AnyShapeStyle(.clear))
                 .overlay {
                     Circle()
-                        .strokeBorder(isDone ? AnyShapeStyle(.clear) : AnyShapeStyle(.secondary), lineWidth: 1.5)
+                        .strokeBorder(
+                            isDone ? AnyShapeStyle(.clear) : AnyShapeStyle(.secondary),
+                            style: StrokeStyle(lineWidth: 1.5, dash: isSkipped ? [3, 3] : [])
+                        )
                 }
 
             Image(systemName: "checkmark")
@@ -99,6 +126,12 @@ struct ChoreRowView: View {
                 .foregroundStyle(.white)
                 .opacity(isDone ? 1 : 0)
                 .scaleEffect(isDone ? 1 : 0.4)
+
+            Image(systemName: "forward.end.fill")
+                .font(.system(size: checkmarkSize * 0.85, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .opacity(isSkipped ? 1 : 0)
+                .scaleEffect(isSkipped ? 1 : 0.4)
         }
         .frame(width: circleSize, height: circleSize)
         .symbolEffect(.bounce, value: isDone)
@@ -144,6 +177,14 @@ private struct NoteLabelStyle: LabelStyle {
             isDone: false,
             detail: "Overdue · was due Oct 20",
             isOverdue: true,
+            onToggle: { _ in },
+            onEdit: {}
+        )
+        ChoreRowView(
+            chore: Chore(name: "Mow the lawn", frequency: .weekly, sortOrder: 3),
+            isDone: false,
+            isSkipped: true,
+            detail: "Skipped this week",
             onToggle: { _ in },
             onEdit: {}
         )

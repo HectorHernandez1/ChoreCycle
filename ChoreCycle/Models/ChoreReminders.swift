@@ -66,7 +66,7 @@ enum ChoreReminders {
         // A reminder already sitting in Notification Center is stale once
         // its chore has been dealt with (in the app, by Siri, or on another
         // device), so clear those too.
-        let handled = Set(chores.filter { $0.isDone(asOf: now, calendar: calendar) }
+        let handled = Set(chores.filter { $0.isHandled(asOf: now, calendar: calendar) }
             .compactMap { $0.choreID.map(identifier(for:)) })
         let delivered = await center.deliveredNotifications().map(\.request.identifier)
         center.removeDeliveredNotifications(withIdentifiers: delivered.filter(handled.contains))

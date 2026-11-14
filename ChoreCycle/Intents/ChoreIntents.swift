@@ -167,10 +167,10 @@ struct CompleteChoreIntent: AppIntent {
         guard let chore = matches.first else {
             throw ChoreIntentError.choreNotFound
         }
-        guard !chore.isDone(asOf: date) else {
+        // Turns a skip into a check-off; does nothing if already done.
+        guard chore.markDone(on: date, in: context) else {
             return (chore, false)
         }
-        chore.addCompletion(at: date)
         try context.save()
         return (chore, true)
     }
@@ -223,7 +223,8 @@ struct ChoresLeftIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<[ChoreEntity]> & ProvidesDialog {
         let chores = try ChoreQuery.allChores(in: container.mainContext)
-        let left = Chore.checklist(for: checklist.frequency, from: chores).filter { !$0.isDone() }
+        // Skipped chores aren't "left".
+        let left = Chore.checklist(for: checklist.frequency, from: chores).filter { !$0.isHandled() }
         let periodName = checklist == .thisWeek ? "this week" : "this month"
         let entities = left.compactMap(ChoreEntity.init)
 

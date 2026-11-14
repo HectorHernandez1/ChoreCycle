@@ -70,7 +70,7 @@ struct ChoreEditorSheet: View {
         case .monthly:
             "Resets on the first of each month."
         case .everyTwoWeeks, .everyThreeMonths, .everySixMonths, .yearly:
-            if let lastDone = chore?.lastCompletion() {
+            if let lastDone = chore?.lastDone() {
                 "Last done \(lastDone.formatted(date: .abbreviated, time: .omitted)). "
                 + "Due again \(intervalDescription) after each time you check it off."
             } else {

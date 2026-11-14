@@ -107,8 +107,9 @@ struct ChoreListView: View {
             let regular = regularChores
             let due = dueThisPeriod
             let later = upcoming
-            // Chores due this period count toward the ring; upcoming ones don't.
-            let counted = regular + due
+            // Chores due this period count toward the ring; upcoming and
+            // skipped ones don't.
+            let counted = (regular + due).filter { !$0.isSkipped(asOf: now) }
             let doneCount = counted.filter { $0.isDone(asOf: now) }.count
             let isEmpty = regular.isEmpty && longCycleChores.isEmpty
 
@@ -237,16 +238,33 @@ struct ChoreListView: View {
     @ViewBuilder
     private func choreRows(_ sectionChores: [Chore], canReorder: Bool = false) -> some View {
         ForEach(sectionChores) { chore in
+            let skipAction = skipAction(for: chore)
             ChoreRowView(
                 chore: chore,
                 isDone: chore.isDone(asOf: now),
+                isSkipped: chore.isSkipped(asOf: now),
                 detail: detail(for: chore),
                 isOverdue: chore.isOverdue(asOf: now),
                 onToggle: { checkCenter in toggle(chore, at: checkCenter) },
-                onEdit: { choreBeingEdited = chore }
+                onEdit: { choreBeingEdited = chore },
+                skipAction: skipAction
             )
+            // Swipe right to skip. Custom swipe actions replace the ones
+            // `.onDelete` would add, so Delete is spelled out on the other
+            // side (`.onDelete` below still powers Edit mode).
+            .swipeActions(edge: .leading) {
+                if let skipAction {
+                    Button(skipAction.title, systemImage: "forward.end", action: skipAction.perform)
+                        .tint(.indigo)
+                }
+            }
+            .swipeActions(edge: .trailing) {
+                Button("Delete", systemImage: "trash", role: .destructive) {
+                    delete([chore])
+                }
+            }
         }
-        // `.onDelete` adds the standard swipe-left-to-delete gesture.
+        // `.onDelete` adds the delete buttons in Edit mode.
         .onDelete { offsets in
             delete(offsets.map { sectionChores[$0] })
         }
@@ -313,9 +331,46 @@ struct ChoreListView: View {
         .accessibilityAddTraits(.isHeader)
     }
 
+    /// "Skip This Week" (or "Skip This Month" / "Skip This Time" for chores
+    /// that roll over) when the chore is still open, "Don't Skip" once it's
+    /// skipped, and nothing once it's done.
+    private func skipAction(for chore: Chore) -> (title: String, perform: () -> Void)? {
+        if chore.isSkipped(asOf: now) {
+            return ("Don't Skip", { toggleSkip(chore) })
+        }
+        guard !chore.isDone(asOf: now) else { return nil }
+        let title = switch chore.frequency {
+        case .weekly: "Skip This Week"
+        case .monthly: "Skip This Month"
+        case .everyTwoWeeks, .everyThreeMonths, .everySixMonths, .yearly: "Skip This Time"
+        }
+        return (title, { toggleSkip(chore) })
+    }
+
+    private func toggleSkip(_ chore: Chore) {
+        now = .now
+        withAnimation(.snappy) {
+            if chore.isSkipped(asOf: now) {
+                chore.toggleCompletion(on: now, in: modelContext) // clears the skip
+            } else {
+                chore.skip(on: now, in: modelContext)
+            }
+        }
+        // A skip moves a long-cycle chore's due date and settles a pinned
+        // weekly chore for the week, so its reminder needs to move.
+        if chore.hasReminder {
+            refreshReminders()
+        }
+    }
+
     /// The subtitle under a chore's name: the due date for rolling chores
-    /// and weekly chores pinned to a day. Other chores have none.
+    /// and weekly chores pinned to a day, or "Skipped this week". Other
+    /// chores have none.
     private func detail(for chore: Chore) -> String? {
+        if chore.isSkipped(asOf: now) {
+            let periodName = chore.frequency.calendarComponent == .weekOfYear ? "week" : "month"
+            return "Skipped this \(periodName)"
+        }
         guard let dueDate = chore.dueDate(asOf: now) else { return nil }
         let calendar = Calendar.mondayFirst
 
@@ -331,7 +386,7 @@ struct ChoreListView: View {
             return calendar.isDate(dueDate, inSameDayAs: now) ? "Due today" : "Due \(weekday)"
         }
 
-        if chore.isDone(asOf: now), let lastDone = chore.lastCompletion(asOf: now),
+        if chore.isDone(asOf: now), let lastDone = chore.lastDone(asOf: now),
            chore.isDue(inPeriodContaining: now) {
             return "Done \(lastDone.formatted(.dateTime.month(.abbreviated).day()))"
         }
@@ -369,7 +424,9 @@ struct ChoreListView: View {
         // Use the real current time, in case "now" went stale while the app
         // sat open across midnight.
         now = .now
-        let wasDone = chore.isDone(asOf: now)
+        // Tapping a skipped chore un-skips it rather than checking it off,
+        // so either way there's nothing to celebrate.
+        let wasDone = chore.isHandled(asOf: now)
         withAnimation(.snappy) {
             chore.toggleCompletion(on: now, in: modelContext)
         }
@@ -393,7 +450,7 @@ struct ChoreListView: View {
         // The relationship was updated synchronously above, so this already
         // reflects the chore that was just checked off. Only chores in this
         // period's checklist count, matching the progress ring.
-        let counted = regularChores + dueThisPeriod
+        let counted = (regularChores + dueThisPeriod).filter { !$0.isSkipped(asOf: now) }
         let isEverythingDone = counted.allSatisfy { $0.isDone(asOf: now) }
         celebrate(at: checkCenter, isEverythingDone: isEverythingDone)
     }

@@ -19,7 +19,7 @@ struct HistoryView: View {
                 from: ChoreHistory.summaries(of: chores, frequency: .weekly, asOf: now))
             let monthlyStreak = ChoreHistory.streak(
                 from: ChoreHistory.summaries(of: chores, frequency: .monthly, asOf: now))
-            let totalDone = weeks.reduce(0) { $0 + $1.entries.count }
+            let totalDone = weeks.reduce(0) { $0 + $1.entries.filter { !$0.isSkip }.count }
             // Three side-by-side tiles get too narrow at the largest text
             // sizes, so they stack instead. `AnyLayout` switches between the
             // two without rebuilding the tiles.
@@ -146,7 +146,8 @@ private struct WeekHeader: View {
     }
 }
 
-/// One check-off: the chore's name, how often it repeats, and the day.
+/// One check-off (or skip): the chore's name, how often it repeats, and the
+/// day.
 private struct HistoryRow: View {
     let entry: HistoryEntry
 
@@ -154,9 +155,16 @@ private struct HistoryRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.choreName)
-                Text(entry.frequency.title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(entry.isSkip ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                if entry.isSkip {
+                    Label("Skipped", systemImage: "forward.end")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(entry.frequency.title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             Spacer()
             Text(entry.completedAt, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day())

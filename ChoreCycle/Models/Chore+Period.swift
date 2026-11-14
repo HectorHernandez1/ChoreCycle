@@ -12,6 +12,22 @@ extension Calendar {
         calendar.firstWeekday = 2
         return calendar
     }
+
+    /// The day in the same week as `date` (by this calendar's week, so
+    /// Monday to Sunday for `mondayFirst`) that falls on `weekday`
+    /// (1 = Sunday … 7 = Saturday), at the start of that day.
+    nonisolated func date(_ date: Date, movedToWeekday weekday: Int) -> Date? {
+        guard let week = dateInterval(of: .weekOfYear, for: date) else { return nil }
+        // Days into the week: e.g. Tuesday is 1 day after a Monday start.
+        let offset = (weekday - firstWeekday + 7) % 7
+        return self.date(byAdding: .day, value: offset, to: week.start)
+    }
+
+    /// Weekday numbers in display order for this calendar (Monday first
+    /// for `mondayFirst`), for pickers.
+    nonisolated var orderedWeekdays: [Int] {
+        (0..<7).map { (firstWeekday - 1 + $0) % 7 + 1 }
+    }
 }
 
 extension Frequency {
@@ -59,16 +75,61 @@ extension Chore {
         allCompletions.map(\.completedAt).filter { $0 <= date }.max()
     }
 
-    /// When a rolling chore (every 3 months, 6 months, yearly) is next due:
-    /// the last completion plus the interval, or `nextDueDate` if it has
-    /// never been done (falling back to "due now"). Always `nil` for weekly
-    /// and monthly chores, which don't have a single due date.
+    /// When the chore is next due, or `nil` if it doesn't have a due date.
+    ///
+    /// - Rolling chores (every 2 weeks, 3 months, 6 months, yearly): the
+    ///   last completion plus the interval, or `nextDueDate` if it has never
+    ///   been done (falling back to "due now"). With a `dueWeekday`, the
+    ///   result moves to that day of the same week, so doing a Tuesday chore
+    ///   a day late doesn't make it drift to Wednesdays.
+    /// - Weekly chores with a `dueWeekday`: that day in the current week.
+    /// - Other weekly and monthly chores: `nil`.
     func dueDate(asOf date: Date = .now, calendar: Calendar = .mondayFirst) -> Date? {
-        guard let months = frequency.monthInterval else { return nil }
-        if let last = lastCompletion(asOf: date) {
-            return calendar.date(byAdding: .month, value: months, to: last) ?? last
+        guard let interval = frequency.rollingInterval else {
+            guard frequency == .weekly, let dueWeekday else { return nil }
+            return calendar.date(date, movedToWeekday: dueWeekday)
         }
-        return nextDueDate ?? createdAt
+        guard let last = lastCompletion(asOf: date) else {
+            return nextDueDate ?? createdAt
+        }
+        let due = calendar.date(byAdding: interval, to: last) ?? last
+        if frequency.supportsWeekday, let dueWeekday {
+            return calendar.date(due, movedToWeekday: dueWeekday)
+        }
+        return due
+    }
+
+    /// Whether this chore gets a due-date notification: every rolling chore,
+    /// and weekly chores pinned to a day.
+    var hasReminder: Bool {
+        !frequency.isCalendarAligned || (frequency == .weekly && dueWeekday != nil)
+    }
+
+    /// When the next reminder for this chore should go off (at `hour` on its
+    /// due day), or `nil` if none should be scheduled.
+    ///
+    /// Rolling chores get one reminder on their due date, skipped once that
+    /// morning has passed (the chore is showing as overdue in the app by
+    /// then). Weekly chores pinned to a day remind on that day; if it's
+    /// already done this week or the moment has passed, the reminder goes
+    /// to next week's day instead, so one is always waiting.
+    func nextReminderDate(after now: Date = .now,
+                          hour: Int,
+                          calendar: Calendar = .mondayFirst) -> Date? {
+        guard hasReminder, let due = dueDate(asOf: now, calendar: calendar) else { return nil }
+
+        func atHour(_ day: Date) -> Date? {
+            calendar.date(bySettingHour: hour, minute: 0, second: 0, of: day)
+        }
+        guard let fire = atHour(due) else { return nil }
+
+        if frequency.isCalendarAligned {
+            if !isDone(asOf: now, calendar: calendar), fire > now {
+                return fire
+            }
+            return calendar.date(byAdding: .weekOfYear, value: 1, to: due).flatMap(atHour)
+        }
+        return fire > now ? fire : nil
     }
 
     /// Whether the chore has been checked off in the current checklist
@@ -81,42 +142,47 @@ extension Chore {
         !completions(inPeriodContaining: date, calendar: calendar).isEmpty
     }
 
-    /// Whether a rolling chore is overdue: its due date is before today and
-    /// it hasn't been checked off since. A chore due today is not overdue.
+    /// Whether the chore is overdue: its due date is before today and it
+    /// hasn't been checked off since. A chore due today is not overdue.
+    ///
+    /// Rolling chores get a new due date as soon as they're checked off, so
+    /// only weekly chores need the explicit "done this week" check.
     func isOverdue(asOf date: Date = .now, calendar: Calendar = .mondayFirst) -> Bool {
-        guard !frequency.isCalendarAligned,
-              let due = dueDate(asOf: date, calendar: calendar) else { return false }
+        guard let due = dueDate(asOf: date, calendar: calendar) else { return false }
+        if frequency.isCalendarAligned && isDone(asOf: date, calendar: calendar) {
+            return false
+        }
         return due < calendar.startOfDay(for: date)
     }
 
-    /// Whether a rolling chore belongs in the Monthly checklist for the month
-    /// containing `date`: either it's due (or overdue) by the end of that
-    /// month, or it was checked off during that month and should stay
-    /// visible as done until the month ends.
-    func isDue(inMonthContaining date: Date = .now, calendar: Calendar = .mondayFirst) -> Bool {
+    /// Whether a rolling chore belongs in the checklist for the period
+    /// containing `date` (the week for every 2 weeks, the month for the
+    /// rest): either it's due (or overdue) by the end of that period, or it
+    /// was checked off during it and should stay visible as done until the
+    /// period ends.
+    func isDue(inPeriodContaining date: Date = .now, calendar: Calendar = .mondayFirst) -> Bool {
         guard !frequency.isCalendarAligned,
               let due = dueDate(asOf: date, calendar: calendar) else { return false }
         if isDone(asOf: date, calendar: calendar) {
             return true
         }
-        let month = calendar.dateInterval(of: .month, for: date)
-            ?? DateInterval(start: date, duration: 0)
-        return due < month.end
+        return due < frequency.period(containing: date, calendar: calendar).end
     }
 
     /// The chores that make up a checklist (the ones its progress ring
-    /// counts): weekly chores for `.weekly`; for `.monthly`, monthly chores
-    /// plus any long-cycle chores due this month.
+    /// counts): the tab's own chores (weekly or monthly) plus any rolling
+    /// chores that live on that tab and are due this period.
     static func checklist(for frequency: Frequency,
                           from chores: [Chore],
                           asOf date: Date = .now,
                           calendar: Calendar = .mondayFirst) -> [Chore] {
         let regular = chores.filter { $0.frequency == frequency }
-        guard frequency == .monthly else { return regular }
-        let dueThisMonth = chores.filter {
-            !$0.frequency.isCalendarAligned && $0.isDue(inMonthContaining: date, calendar: calendar)
+        let dueThisPeriod = chores.filter {
+            !$0.frequency.isCalendarAligned
+                && $0.frequency.calendarComponent == frequency.calendarComponent
+                && $0.isDue(inPeriodContaining: date, calendar: calendar)
         }
-        return regular + dueThisMonth
+        return regular + dueThisPeriod
     }
 
     /// Checks the chore off (adds a `Completion` dated `date`) or, if it's

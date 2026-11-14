@@ -40,6 +40,12 @@ final class Chore {
     /// fills them in at launch.
     var choreID: UUID?
 
+    /// For weekly and every-2-weeks chores: the day of the week it's done,
+    /// using `Calendar`'s numbering (1 = Sunday, 2 = Monday … 7 = Saturday).
+    /// `nil` means "any day". Drives the "Due Tuesday" label and a reminder
+    /// on that morning.
+    var dueWeekday: Int?
+
     /// Every time this chore was checked off, across all weeks and months.
     ///
     /// `@Relationship` tells SwiftData this is a link to other models rather
@@ -58,12 +64,14 @@ final class Chore {
          sortOrder: Int,
          createdAt: Date = .now,
          nextDueDate: Date? = nil,
+         dueWeekday: Int? = nil,
          choreID: UUID = UUID()) {
         self.name = name
         self.frequency = frequency
         self.sortOrder = sortOrder
         self.createdAt = createdAt
         self.nextDueDate = nextDueDate
+        self.dueWeekday = dueWeekday
         self.choreID = choreID
     }
 }

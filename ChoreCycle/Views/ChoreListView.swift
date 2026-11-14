@@ -79,32 +79,35 @@ struct ChoreListView: View {
         chores.filter { $0.frequency == frequency }
     }
 
-    /// Long-cycle chores, which only ever appear on the Monthly tab.
+    /// Rolling chores that live on this tab: every 2 weeks on the Weekly
+    /// tab; every 3 months, 6 months, and yearly on the Monthly tab.
     private var longCycleChores: [Chore] {
-        guard frequency == .monthly else { return [] }
-        return chores.filter { !$0.frequency.isCalendarAligned }
+        chores.filter {
+            !$0.frequency.isCalendarAligned && $0.frequency.calendarComponent == frequency.calendarComponent
+        }
     }
 
-    /// Long-cycle chores that belong in this month's checklist, soonest first.
-    private var dueThisMonth: [Chore] {
+    /// Rolling chores that belong in this week's or month's checklist,
+    /// soonest first.
+    private var dueThisPeriod: [Chore] {
         longCycleChores
-            .filter { $0.isDue(inMonthContaining: now) }
+            .filter { $0.isDue(inPeriodContaining: now) }
             .sorted { ($0.dueDate(asOf: now) ?? now) < ($1.dueDate(asOf: now) ?? now) }
     }
 
-    /// Long-cycle chores not due until a later month, soonest first.
+    /// Rolling chores not due until a later week or month, soonest first.
     private var upcoming: [Chore] {
         longCycleChores
-            .filter { !$0.isDue(inMonthContaining: now) }
+            .filter { !$0.isDue(inPeriodContaining: now) }
             .sorted { ($0.dueDate(asOf: now) ?? now) < ($1.dueDate(asOf: now) ?? now) }
     }
 
     var body: some View {
         NavigationStack {
             let regular = regularChores
-            let due = dueThisMonth
+            let due = dueThisPeriod
             let later = upcoming
-            // Chores due this month count toward the ring; upcoming ones don't.
+            // Chores due this period count toward the ring; upcoming ones don't.
             let counted = regular + due
             let doneCount = counted.filter { $0.isDone(asOf: now) }.count
             let isEmpty = regular.isEmpty && longCycleChores.isEmpty
@@ -131,7 +134,7 @@ struct ChoreListView: View {
                     Section {
                         choreRows(due)
                     } header: {
-                        Text("Due This Month")
+                        Text(frequency == .weekly ? "Due This Week" : "Due This Month")
                     }
                 }
 
@@ -310,23 +313,39 @@ struct ChoreListView: View {
         .accessibilityAddTraits(.isHeader)
     }
 
-    /// The subtitle under a long-cycle chore's name. Regular weekly and
-    /// monthly chores have none.
+    /// The subtitle under a chore's name: the due date for rolling chores
+    /// and weekly chores pinned to a day. Other chores have none.
     private func detail(for chore: Chore) -> String? {
-        guard !chore.frequency.isCalendarAligned,
-              let dueDate = chore.dueDate(asOf: now) else { return nil }
+        guard let dueDate = chore.dueDate(asOf: now) else { return nil }
+        let calendar = Calendar.mondayFirst
+
+        // Weekly chores pinned to a day: "Due Tuesday", "Due today".
+        if chore.frequency.isCalendarAligned {
+            let weekday = dueDate.formatted(.dateTime.weekday(.wide))
+            if chore.isDone(asOf: now) {
+                return "Every \(weekday)"
+            }
+            if chore.isOverdue(asOf: now) {
+                return "Overdue · was due \(weekday)"
+            }
+            return calendar.isDate(dueDate, inSameDayAs: now) ? "Due today" : "Due \(weekday)"
+        }
 
         if chore.isDone(asOf: now), let lastDone = chore.lastCompletion(asOf: now),
-           chore.isDue(inMonthContaining: now) {
+           chore.isDue(inPeriodContaining: now) {
             return "Done \(lastDone.formatted(.dateTime.month(.abbreviated).day()))"
         }
         if chore.isOverdue(asOf: now) {
             return "Overdue · was due \(dueDate.formatted(.dateTime.month(.abbreviated).day()))"
         }
-        let sameYear = Calendar.mondayFirst.isDate(dueDate, equalTo: now, toGranularity: .year)
-        let format: Date.FormatStyle = sameYear
-            ? .dateTime.month(.abbreviated).day()
-            : .dateTime.month(.abbreviated).day().year()
+        // Every-2-weeks chores are close enough that the weekday helps.
+        var format: Date.FormatStyle = .dateTime.month(.abbreviated).day()
+        if chore.frequency == .everyTwoWeeks {
+            format = format.weekday(.abbreviated)
+        }
+        if !calendar.isDate(dueDate, equalTo: now, toGranularity: .year) {
+            format = format.year()
+        }
         return "Due \(dueDate.formatted(format))"
     }
 
@@ -354,9 +373,9 @@ struct ChoreListView: View {
         withAnimation(.snappy) {
             chore.toggleCompletion(on: now, in: modelContext)
         }
-        // Checking a long-cycle chore pushes its due date out; unchecking
-        // pulls it back. Either way the reminder needs to move.
-        if !chore.frequency.isCalendarAligned {
+        // Checking a chore with a due date pushes its reminder out;
+        // unchecking pulls it back. Either way the reminder needs to move.
+        if chore.hasReminder {
             refreshReminders()
         }
 
@@ -374,7 +393,7 @@ struct ChoreListView: View {
         // The relationship was updated synchronously above, so this already
         // reflects the chore that was just checked off. Only chores in this
         // period's checklist count, matching the progress ring.
-        let counted = regularChores + dueThisMonth
+        let counted = regularChores + dueThisPeriod
         let isEverythingDone = counted.allSatisfy { $0.isDone(asOf: now) }
         celebrate(at: checkCenter, isEverythingDone: isEverythingDone)
     }

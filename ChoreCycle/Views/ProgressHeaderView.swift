@@ -22,7 +22,7 @@ struct ProgressHeaderView: View {
     private var periodLabel: String {
         let period = frequency.period(containing: now)
         switch frequency {
-        case .weekly:
+        case .weekly, .everyTwoWeeks:
             // The interval's end is the first instant of next week, so step
             // back a second to land on the last day of this week.
             let lastDay = period.end.addingTimeInterval(-1)

@@ -78,14 +78,14 @@ extension DatabaseTests {
 
             #expect(!chore.isDone(asOf: now))
             #expect(!chore.isOverdue(asOf: now), "Due today is not late yet")
-            #expect(chore.isDue(inMonthContaining: now))
+            #expect(chore.isDue(inPeriodContaining: now))
         }
 
         @Test func dueYesterdayIsOverdue() throws {
             let context = try makeContext()
             let chore = makeChore(nextDueDate: day(2026, 11, 7, hour: 23, minute: 59), in: context)
             #expect(chore.isOverdue(asOf: now))
-            #expect(chore.isDue(inMonthContaining: now))
+            #expect(chore.isDue(inPeriodContaining: now))
         }
 
         @Test func dueLaterThisMonthIsUncheckedButListed() throws {
@@ -97,13 +97,13 @@ extension DatabaseTests {
             #expect(chore.dueDate(asOf: now) == day(2026, 11, 25))
             #expect(!chore.isDone(asOf: now))
             #expect(!chore.isOverdue(asOf: now))
-            #expect(chore.isDue(inMonthContaining: now))
+            #expect(chore.isDue(inPeriodContaining: now))
         }
 
         @Test func dueNextMonthIsUpcoming() throws {
             let context = try makeContext()
             let chore = makeChore(completedOn: day(2026, 6, 8), in: context) // due Dec 8
-            #expect(!chore.isDue(inMonthContaining: now))
+            #expect(!chore.isDue(inPeriodContaining: now))
             #expect(!chore.isDone(asOf: now))
             #expect(!chore.isOverdue(asOf: now))
         }
@@ -112,17 +112,17 @@ extension DatabaseTests {
             let context = try makeContext()
             let chore = makeChore(completedOn: day(2026, 4, 8), in: context) // due Oct 8
             #expect(chore.isOverdue(asOf: now))
-            #expect(chore.isDue(inMonthContaining: now))
+            #expect(chore.isDue(inPeriodContaining: now))
             #expect(!chore.isDone(asOf: now))
         }
 
         @Test func dueOnTheLastDayOfTheMonthCountsAsThisMonth() throws {
             let context = try makeContext()
             let chore = makeChore(nextDueDate: day(2026, 11, 30, hour: 23, minute: 59), in: context)
-            #expect(chore.isDue(inMonthContaining: now))
+            #expect(chore.isDue(inPeriodContaining: now))
 
             let firstOfNext = makeChore(nextDueDate: day(2026, 12, 1, hour: 0), in: context)
-            #expect(!firstOfNext.isDue(inMonthContaining: now))
+            #expect(!firstOfNext.isDue(inPeriodContaining: now))
         }
 
         @Test func weeklyChoresAreNeverRolling() throws {
@@ -131,7 +131,7 @@ extension DatabaseTests {
             context.insert(chore)
             #expect(chore.dueDate(asOf: now) == nil)
             #expect(!chore.isOverdue(asOf: now))
-            #expect(!chore.isDue(inMonthContaining: now))
+            #expect(!chore.isDue(inPeriodContaining: now))
         }
 
         // MARK: Toggling
@@ -145,7 +145,7 @@ extension DatabaseTests {
             #expect(chore.isDone(asOf: now))
             #expect(!chore.isOverdue(asOf: now))
             #expect(chore.dueDate(asOf: now) == day(2027, 5, 8, hour: 12))
-            #expect(chore.isDue(inMonthContaining: now), "Stays visible as done until the month ends")
+            #expect(chore.isDue(inPeriodContaining: now), "Stays visible as done until the month ends")
             #expect(chore.allCompletions.count == 2)
         }
 
@@ -165,12 +165,12 @@ extension DatabaseTests {
         @Test func checkingEarlyMovesItIntoThisMonth() throws {
             let context = try makeContext()
             let chore = makeChore(completedOn: day(2026, 6, 8), in: context) // due Dec 8, upcoming
-            #expect(!chore.isDue(inMonthContaining: now))
+            #expect(!chore.isDue(inPeriodContaining: now))
 
             chore.toggleCompletion(on: now, in: context)
 
             #expect(chore.isDone(asOf: now))
-            #expect(chore.isDue(inMonthContaining: now))
+            #expect(chore.isDue(inPeriodContaining: now))
             #expect(chore.dueDate(asOf: now) == day(2027, 5, 8, hour: 12))
         }
 
@@ -181,7 +181,7 @@ extension DatabaseTests {
 
             let december = day(2026, 12, 15)
             #expect(!chore.isDone(asOf: december))
-            #expect(!chore.isDue(inMonthContaining: december), "Due May 2027, so it's upcoming in December")
+            #expect(!chore.isDue(inPeriodContaining: december), "Due May 2027, so it's upcoming in December")
         }
     }
 }

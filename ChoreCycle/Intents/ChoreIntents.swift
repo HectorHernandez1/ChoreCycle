@@ -140,14 +140,14 @@ nonisolated struct CompleteChoreIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let context = container.mainContext
         let outcome = try Self.markDone(chore.id, in: context)
-        let periodName = outcome.chore.frequency == .weekly ? "this week" : "this month"
+        let periodName = outcome.chore.frequency.calendarComponent == .weekOfYear ? "this week" : "this month"
         let name = outcome.chore.name
 
         guard outcome.didCheckOff else {
             return .result(dialog: "\(name) is already done \(periodName).")
         }
-        // Checking off a long-cycle chore moves its due-date reminder.
-        if !outcome.chore.frequency.isCalendarAligned {
+        // Checking off a chore with a due date moves its reminder.
+        if outcome.chore.hasReminder {
             await ChoreReminders.sync(in: context, enabled: UserSettings().remindersEnabled)
         }
         return .result(dialog: "Nice work! \(name) is done \(periodName).")

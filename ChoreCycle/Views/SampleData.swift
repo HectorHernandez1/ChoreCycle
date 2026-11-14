@@ -39,6 +39,12 @@ struct SampleData: PreviewModifier {
 
         context.insert(Chore(name: "Flip mattress", frequency: .everyThreeMonths, sortOrder: nextOrder + 3,
                              nextDueDate: calendar.date(byAdding: .month, value: 2, to: .now)))
+
+        // Weekly-tab extras: an every-2-weeks chore due now, and the trash
+        // pinned to Tuesdays.
+        context.insert(Chore(name: "Change bed sheets", frequency: .everyTwoWeeks, sortOrder: nextOrder + 4,
+                             nextDueDate: .now))
+        chores.first { $0.name.hasPrefix("Take out trash") }?.dueWeekday = 3
         return container
     }
 

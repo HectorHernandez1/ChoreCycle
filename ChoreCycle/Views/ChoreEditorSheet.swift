@@ -19,6 +19,8 @@ struct ChoreEditorSheet: View {
     @State private var name: String
     @State private var frequency: Frequency
     @State private var nextDueDate: Date
+    /// `nil` means "any day".
+    @State private var dueWeekday: Int?
 
     /// Drives keyboard focus so the name field is ready to type into as
     /// soon as the sheet appears.
@@ -31,6 +33,17 @@ struct ChoreEditorSheet: View {
         self.name = chore?.name ?? ""
         self.frequency = chore?.frequency ?? defaultFrequency
         self.nextDueDate = chore?.nextDueDate ?? .now
+        self.dueWeekday = chore?.dueWeekday
+    }
+
+    /// The weekday to save: only weekly and every-2-weeks chores keep one.
+    private var effectiveWeekday: Int? {
+        frequency.supportsWeekday ? dueWeekday : nil
+    }
+
+    /// "Tuesday" for the footer, or `nil` for "any day".
+    private var weekdayName: String? {
+        effectiveWeekday.map { Calendar.mondayFirst.weekdaySymbols[$0 - 1] }
     }
 
     private var trimmedName: String {
@@ -45,25 +58,30 @@ struct ChoreEditorSheet: View {
     }
 
     private var frequencyFooter: String {
-        switch frequency {
+        let base = switch frequency {
         case .weekly:
             "Resets every Monday."
         case .monthly:
             "Resets on the first of each month."
-        case .everyThreeMonths, .everySixMonths, .yearly:
+        case .everyTwoWeeks, .everyThreeMonths, .everySixMonths, .yearly:
             if let lastDone = chore?.lastCompletion() {
                 "Last done \(lastDone.formatted(date: .abbreviated, time: .omitted)). "
                 + "Due again \(intervalDescription) after each time you check it off."
             } else {
-                "Shows up in the Monthly tab when it's due, and again "
-                + "\(intervalDescription) after each time you check it off."
+                "Shows up in the \(frequency == .everyTwoWeeks ? "Weekly" : "Monthly") tab when it's due, "
+                + "and again \(intervalDescription) after each time you check it off."
             }
         }
+        guard let weekdayName else { return base }
+        return base + " Due on \(weekdayName)s, with a reminder that morning."
     }
 
-    /// "3 months", "6 months", or "a year", for the footer text.
+    /// "2 weeks", "3 months", "6 months", or "a year", for the footer text.
     private var intervalDescription: String {
-        switch frequency.monthInterval {
+        if frequency == .everyTwoWeeks {
+            return "2 weeks"
+        }
+        return switch frequency.monthInterval {
         case 12: "a year"
         case let months?: "\(months) months"
         case nil: ""
@@ -92,6 +110,17 @@ struct ChoreEditorSheet: View {
                     }
                     .pickerStyle(.menu)
 
+                    if frequency.supportsWeekday {
+                        Picker("Day", selection: $dueWeekday) {
+                            Text("Any Day").tag(Int?.none)
+                            ForEach(Calendar.mondayFirst.orderedWeekdays, id: \.self) { weekday in
+                                Text(Calendar.mondayFirst.weekdaySymbols[weekday - 1])
+                                    .tag(Int?.some(weekday))
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+
                     if showsNextDueDate {
                         DatePicker("Next due", selection: $nextDueDate, displayedComponents: .date)
                     }
@@ -101,6 +130,7 @@ struct ChoreEditorSheet: View {
                     Text(frequencyFooter)
                 }
                 .animation(.snappy, value: showsNextDueDate)
+                .animation(.snappy, value: frequency.supportsWeekday)
             }
             .navigationTitle(chore == nil ? "New Chore" : "Edit Chore")
             .toolbarTitleDisplayMode(.inline)
@@ -133,7 +163,11 @@ struct ChoreEditorSheet: View {
         // Weekly and monthly chores never have a due date. Rolling chores
         // only need one until their first completion.
         let dueDate: Date? = showsNextDueDate ? Calendar.mondayFirst.startOfDay(for: nextDueDate) : nil
+        // Read before editing: if the chore *used* to have a reminder, the
+        // old one needs clearing even if it no longer has one.
+        let hadReminder = chore?.hasReminder ?? false
 
+        let saved: Chore
         if let chore {
             // A chore moved to another section goes to the bottom of it.
             if chore.frequency != frequency {
@@ -142,20 +176,24 @@ struct ChoreEditorSheet: View {
             chore.name = trimmedName
             chore.frequency = frequency
             chore.nextDueDate = dueDate
+            chore.dueWeekday = effectiveWeekday
+            saved = chore
         } else {
             // Put new chores at the bottom of the list.
-            modelContext.insert(Chore(
+            saved = Chore(
                 name: trimmedName,
                 frequency: frequency,
                 sortOrder: nextSortOrder(),
-                nextDueDate: dueDate
-            ))
+                nextDueDate: dueDate,
+                dueWeekday: effectiveWeekday
+            )
+            modelContext.insert(saved)
         }
 
-        // Saving a long-cycle chore is the natural moment to ask for
+        // Saving a chore with a due date is the natural moment to ask for
         // notification permission, since it's the first time a reminder
         // would be useful. `sync` asks only if the person hasn't been asked.
-        if !frequency.isCalendarAligned || chore?.frequency.isCalendarAligned == false {
+        if saved.hasReminder || hadReminder {
             let context = modelContext
             let enabled = settings.remindersEnabled
             Task {

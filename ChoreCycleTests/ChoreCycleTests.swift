@@ -115,7 +115,7 @@ extension DatabaseTests {
 
             #expect(!chore.isDone(asOf: sundayNoon))
             #expect(chore.dueDate(asOf: sundayNoon) == nil)
-            #expect(!chore.isDue(inMonthContaining: sundayNoon))
+            #expect(!chore.isDue(inPeriodContaining: sundayNoon))
         }
 
         @Test func checkingAddsOneCompletion() throws {

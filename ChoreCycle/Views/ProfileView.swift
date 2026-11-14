@@ -71,9 +71,9 @@ struct ProfileView: View {
                 } footer: {
                     if isNotificationAccessDenied && settings.remindersEnabled {
                         Text("Notifications are turned off for ChoreCycle in Settings. Turn them on there to get reminders.")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(Color.warning)
                     } else {
-                        Text("A notification at 9 AM on the day a 3-month, 6-month, or yearly chore is due. Weekly and monthly chores don't send reminders.")
+                        Text("A notification at 9 AM on the day an every-2-weeks, 3-month, 6-month, or yearly chore is due, and on the chosen day for weekly chores set to a specific day.")
                     }
                 }
             }
@@ -103,22 +103,28 @@ struct ProfileView: View {
 private struct AvatarView: View {
     let initials: String
 
+    /// Grows with text size so the initials never outgrow the circle.
+    @ScaledMetric(relativeTo: .title3) private var size: CGFloat = 56
+
     var body: some View {
+        // White on a solid accent circle: every accent color is chosen to
+        // give at least 3:1 under white (see `AccentTheme.color`). A pale
+        // tint behind accent-colored text fell short for several themes.
         ZStack {
             Circle()
-                .fill(.tint.opacity(0.18))
+                .fill(.tint)
             if initials.isEmpty {
                 Image(systemName: "person.fill")
                     .font(.title2)
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(.white)
             } else {
                 Text(initials)
                     .font(.title3.weight(.bold))
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(.white)
                     .contentTransition(.numericText())
             }
         }
-        .frame(width: 56, height: 56)
+        .frame(width: size, height: size)
         .animation(.snappy, value: initials)
         .accessibilityHidden(true)
     }

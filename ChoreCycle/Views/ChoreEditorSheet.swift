@@ -98,7 +98,9 @@ struct ChoreEditorSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("e.g. Vacuum the living room", text: $name)
+                    // The title ("Name") is what VoiceOver announces; the
+                    // prompt is the gray example text shown while empty.
+                    TextField("Name", text: $name, prompt: Text("e.g. Vacuum the living room"))
                         .focused($isNameFocused)
                         .submitLabel(.done)
                         .onSubmit {
@@ -141,7 +143,7 @@ struct ChoreEditorSheet: View {
                 Section {
                     // `axis: .vertical` lets the field grow onto more lines
                     // as you type, like a small text area.
-                    TextField("e.g. Filter size 16×25×1", text: $notes, axis: .vertical)
+                    TextField("Notes", text: $notes, prompt: Text("e.g. Filter size 16×25×1"), axis: .vertical)
                         .lineLimit(2...6)
                 } header: {
                     Text("Notes")

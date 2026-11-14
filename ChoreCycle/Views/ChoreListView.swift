@@ -299,7 +299,7 @@ struct ChoreListView: View {
             HStack {
                 Text("Upcoming")
                 Text("\(count)")
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))

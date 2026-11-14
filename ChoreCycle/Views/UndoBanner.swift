@@ -16,8 +16,10 @@ struct UndoBanner: View {
                 .font(.subheadline)
                 .lineLimit(2)
             Spacer(minLength: 8)
+            // Bold, so the accent-colored label counts as large text, which
+            // needs 3:1 contrast rather than 4.5:1.
             Button("Undo") { onUndo() }
-                .font(.subheadline.weight(.semibold))
+                .font(.subheadline.weight(.bold))
                 .buttonStyle(.borderless)
             Button("Dismiss", systemImage: "xmark") { onDismiss() }
                 .labelStyle(.iconOnly)

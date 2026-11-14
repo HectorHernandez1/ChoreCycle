@@ -25,18 +25,24 @@ nonisolated enum AccentTheme: String, CaseIterable, Identifiable {
         }
     }
 
+    /// The accent fills check circles (under a white check mark), tints the
+    /// progress ring and buttons, and colors bold text such as streak counts.
+    /// Each of those needs at least 3:1 contrast (WCAG) against white, the
+    /// dark backgrounds, and the white check mark. The system teal, yellow,
+    /// orange, green, and mint are too light for that (1.5–2.6:1), so those
+    /// themes use deeper shades of the same hue. The rest are system colors.
     var color: Color {
         switch self {
-        case .teal: .teal
+        case .teal: Color(red: 0.055, green: 0.486, blue: 0.549)
         case .blue: .blue
         case .indigo: .indigo
         case .purple: .purple
         case .pink: .pink
         case .red: .red
-        case .orange: .orange
-        case .yellow: .yellow
-        case .green: .green
-        case .mint: .mint
+        case .orange: Color(red: 0.702, green: 0.349, blue: 0.0)
+        case .yellow: Color(red: 0.639, green: 0.478, blue: 0.0)
+        case .green: Color(red: 0.141, green: 0.541, blue: 0.239)
+        case .mint: Color(red: 0.047, green: 0.506, blue: 0.482)
         case .brown: .brown
         case .graphite: .gray
         }

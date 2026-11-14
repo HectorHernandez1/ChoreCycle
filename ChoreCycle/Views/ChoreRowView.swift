@@ -18,6 +18,11 @@ struct ChoreRowView: View {
     /// the list scrolls.
     @State private var checkCenter = CGPoint.zero
 
+    /// `@ScaledMetric` grows these with the person's text size, so the
+    /// check circle stays in proportion to the chore name next to it.
+    @ScaledMetric(relativeTo: .body) private var circleSize: CGFloat = 26
+    @ScaledMetric(relativeTo: .body) private var checkmarkSize: CGFloat = 13
+
     var body: some View {
         HStack(spacing: 12) {
             Button {
@@ -36,7 +41,7 @@ struct ChoreRowView: View {
                         if let detail {
                             Text(detail)
                                 .font(.caption.weight(isOverdue && !isDone ? .semibold : .regular))
-                                .foregroundStyle(isOverdue && !isDone ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
+                                .foregroundStyle(isOverdue && !isDone ? AnyShapeStyle(Color.warning) : AnyShapeStyle(.secondary))
                                 .contentTransition(.numericText())
                         }
 
@@ -65,7 +70,9 @@ struct ChoreRowView: View {
             Button("Edit \(chore.name)", systemImage: "ellipsis.circle", action: onEdit)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.borderless)
-                .foregroundStyle(.tertiary)
+                // `.secondary`, not `.tertiary`: a button icon needs 3:1
+                // contrast to be findable, and tertiary is about 1.7:1.
+                .foregroundStyle(.secondary)
                 .font(.title3)
         }
         .padding(.vertical, 4)
@@ -84,16 +91,16 @@ struct ChoreRowView: View {
                 .fill(isDone ? AnyShapeStyle(.tint) : AnyShapeStyle(.clear))
                 .overlay {
                     Circle()
-                        .strokeBorder(isDone ? AnyShapeStyle(.clear) : AnyShapeStyle(.tertiary), lineWidth: 1.5)
+                        .strokeBorder(isDone ? AnyShapeStyle(.clear) : AnyShapeStyle(.secondary), lineWidth: 1.5)
                 }
 
             Image(systemName: "checkmark")
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: checkmarkSize, weight: .bold))
                 .foregroundStyle(.white)
                 .opacity(isDone ? 1 : 0)
                 .scaleEffect(isDone ? 1 : 0.4)
         }
-        .frame(width: 26, height: 26)
+        .frame(width: circleSize, height: circleSize)
         .symbolEffect(.bounce, value: isDone)
         .onGeometryChange(for: CGPoint.self) { proxy in
             let frame = proxy.frame(in: .named(ChoreListView.confettiSpace))

@@ -76,7 +76,7 @@ struct ProgressHeaderView: View {
                     .contentTransition(.numericText())
                 Text(periodLabel)
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                     .textCase(.uppercase)
                     .padding(.top, 2)
             }

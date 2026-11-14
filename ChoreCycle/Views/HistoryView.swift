@@ -7,6 +7,7 @@ struct HistoryView: View {
     private var chores: [Chore]
 
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// Reference date for "this week", refreshed when the app comes back.
     @State private var now = Date.now
@@ -19,10 +20,16 @@ struct HistoryView: View {
             let monthlyStreak = ChoreHistory.streak(
                 from: ChoreHistory.summaries(of: chores, frequency: .monthly, asOf: now))
             let totalDone = weeks.reduce(0) { $0 + $1.entries.count }
+            // Three side-by-side tiles get too narrow at the largest text
+            // sizes, so they stack instead. `AnyLayout` switches between the
+            // two without rebuilding the tiles.
+            let statsLayout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(spacing: 12))
+                : AnyLayout(HStackLayout(spacing: 0))
 
             List {
                 Section {
-                    HStack(spacing: 0) {
+                    statsLayout {
                         StatTile(value: weeklyStreak.current, unit: "week",
                                  title: "Weekly Streak", best: weeklyStreak.best)
                         Divider()
@@ -97,7 +104,7 @@ private struct StatTile: View {
             if let best {
                 Text("Best \(best)")
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity)

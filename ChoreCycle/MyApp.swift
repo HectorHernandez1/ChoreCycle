@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import AppIntents
+import UserNotifications
 
 /// `@main` marks the app's entry point, like `if __name__ == "__main__"`.
 @main struct MyApp: App {
@@ -9,6 +10,9 @@ import AppIntents
 
     /// The person's profile and preferences, backed by `UserDefaults`.
     @State private var settings = UserSettings()
+
+    /// Handles the "Mark Done" button on reminders.
+    private let notificationHandler: ReminderNotificationHandler
 
     /// Set only while unit tests are running; see `init`.
     static var testContainer: ModelContainer?
@@ -52,6 +56,14 @@ import AppIntents
         // `ChoreIntents.swift`) has to be registered before anything else.
         let container = container
         AppDependencyManager.shared.add(dependency: container)
+
+        // Likewise, tapping "Mark Done" on a reminder launches the app in
+        // the background, so the handler must be in place at launch.
+        // `UNUserNotificationCenter.delegate` is a weak reference; the app
+        // keeps the handler alive.
+        notificationHandler = ReminderNotificationHandler(container: container)
+        UNUserNotificationCenter.current().delegate = notificationHandler
+        ChoreReminders.registerCategories()
     }
 
     var body: some Scene {

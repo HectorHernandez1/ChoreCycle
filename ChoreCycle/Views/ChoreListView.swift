@@ -261,7 +261,7 @@ struct ChoreListView: View {
     /// banner can put them back.
     private func delete(_ removed: [Chore]) {
         guard !removed.isEmpty else { return }
-        let undo = PendingUndo(chores: removed.map(DeletedChore.init))
+        let undo = PendingUndo(chores: removed.map { DeletedChore($0) })
         withAnimation(.snappy) {
             pendingUndo = undo
         }

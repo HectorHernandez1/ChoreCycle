@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import SwiftData
+import UserNotifications
 @testable import ChoreCycle
 
 /// Pure date helpers and frequency metadata for the every-2-weeks and
@@ -139,6 +140,18 @@ extension DatabaseTests {
 
             let overdue = makeChore(.everySixMonths, nextDueDate: day(2026, 11, 1, hour: 0), in: context)
             #expect(overdue.nextReminderDate(after: sundayNoon, hour: 9) == nil)
+        }
+
+        @Test func reminderCarriesWhatMarkDoneNeeds() throws {
+            let context = try makeContext()
+            let chore = makeChore(.weekly, weekday: 3, in: context)
+            let id = try #require(chore.choreID)
+
+            let content = ChoreReminders.content(for: chore, id: id)
+            #expect(content.title == "Trash")
+            #expect(content.categoryIdentifier == ChoreReminders.categoryIdentifier)
+            #expect(content.userInfo[ChoreReminders.choreIDKey] as? String == id.uuidString)
+            #expect(ChoreReminders.identifier(for: id).hasSuffix(id.uuidString))
         }
 
         @Test func monthlyChoresNeverGetReminders() throws {

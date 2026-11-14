@@ -6,16 +6,17 @@ import SwiftData
 // inside the app's own process (no extension), so it reads and writes the
 // same SwiftData database as the UI.
 //
-// The project makes code `@MainActor` by default. The system creates and
-// inspects these types from other threads, so they're marked `nonisolated`
-// and only hop to the main actor inside `perform()` / the query methods,
-// where they touch the database through `container.mainContext`.
+// The project makes code `@MainActor` by default, which suits these: their
+// `perform()` and query methods touch the database through
+// `container.mainContext`, the same context the UI uses, so changes show up
+// on screen right away. The plain value types the system reads from other
+// threads (the error, the enum, the shortcuts list) are `nonisolated`.
 
 // MARK: - Chore entity
 
 /// How Siri and Shortcuts see a chore: a lightweight, sendable copy of the
 /// few values they need, identified by the chore's permanent `choreID`.
-nonisolated struct ChoreEntity: AppEntity {
+struct ChoreEntity: AppEntity {
     static let typeDisplayRepresentation: TypeDisplayRepresentation = "Chore"
     static let defaultQuery = ChoreQuery()
 
@@ -52,7 +53,7 @@ nonisolated struct ChoreEntity: AppEntity {
 
 /// Finds chores for Siri and Shortcuts: by ID (to replay a saved shortcut),
 /// by name (when someone types or says one), and as a suggestion list.
-nonisolated struct ChoreQuery: EntityStringQuery {
+struct ChoreQuery: EntityStringQuery {
     @Dependency private var container: ModelContainer
 
     @MainActor
@@ -118,7 +119,7 @@ nonisolated enum ChoreIntentError: Error, CustomLocalizedStringResourceConvertib
 /// Unlike tapping the check circle, this never *un*checks a chore. Siri
 /// may also run an intent more than once, so doing it twice has to be
 /// harmless.
-nonisolated struct CompleteChoreIntent: AppIntent {
+struct CompleteChoreIntent: AppIntent {
     static let title: LocalizedStringResource = "Mark Chore Done"
     static let description = IntentDescription(
         "Checks a chore off for the current week or month.",
@@ -201,7 +202,7 @@ nonisolated enum ChecklistKind: String, AppEnum {
 
 /// "What's left in ChoreCycle?" Reads out the unchecked chores and hands
 /// them to the next step of a shortcut.
-nonisolated struct ChoresLeftIntent: AppIntent {
+struct ChoresLeftIntent: AppIntent {
     static let title: LocalizedStringResource = "Get Chores Left"
     static let description = IntentDescription(
         "Lists the chores you haven't checked off yet this week or this month.",

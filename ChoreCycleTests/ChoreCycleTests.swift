@@ -238,7 +238,9 @@ extension DatabaseTests {
             let context = try makeContext()
             let created = day(2026, 1, 1)
             let chore = Chore(name: "Furnace filter", frequency: .everySixMonths, sortOrder: 4,
-                              createdAt: created, nextDueDate: day(2026, 3, 1))
+                              createdAt: created, nextDueDate: day(2026, 3, 1),
+                              notes: "16×25×1, MERV 8")
+            let originalID = chore.choreID
             context.insert(chore)
             chore.addCompletion(at: day(2026, 5, 1))
             chore.addCompletion(at: day(2026, 11, 2))
@@ -258,6 +260,8 @@ extension DatabaseTests {
             #expect(restored.sortOrder == 4)
             #expect(restored.createdAt == created)
             #expect(restored.nextDueDate == day(2026, 3, 1))
+            #expect(restored.notes == "16×25×1, MERV 8")
+            #expect(restored.choreID == originalID, "Saved Siri shortcuts keep working")
             #expect(Set(restored.allCompletions.map(\.completedAt)) == [day(2026, 5, 1), day(2026, 11, 2)])
             #expect(restored.dueDate(asOf: sundayNoon) == day(2027, 5, 2))
         }

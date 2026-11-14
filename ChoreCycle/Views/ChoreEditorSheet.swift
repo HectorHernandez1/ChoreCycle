@@ -21,6 +21,7 @@ struct ChoreEditorSheet: View {
     @State private var nextDueDate: Date
     /// `nil` means "any day".
     @State private var dueWeekday: Int?
+    @State private var notes: String
 
     /// Drives keyboard focus so the name field is ready to type into as
     /// soon as the sheet appears.
@@ -34,6 +35,7 @@ struct ChoreEditorSheet: View {
         self.frequency = chore?.frequency ?? defaultFrequency
         self.nextDueDate = chore?.nextDueDate ?? .now
         self.dueWeekday = chore?.dueWeekday
+        self.notes = chore?.notes ?? ""
     }
 
     /// The weekday to save: only weekly and every-2-weeks chores keep one.
@@ -48,6 +50,10 @@ struct ChoreEditorSheet: View {
 
     private var trimmedName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedNotes: String {
+        notes.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// The "Next due" picker only matters for rolling chores that have never
@@ -131,6 +137,15 @@ struct ChoreEditorSheet: View {
                 }
                 .animation(.snappy, value: showsNextDueDate)
                 .animation(.snappy, value: frequency.supportsWeekday)
+
+                Section {
+                    // `axis: .vertical` lets the field grow onto more lines
+                    // as you type, like a small text area.
+                    TextField("e.g. Filter size 16×25×1", text: $notes, axis: .vertical)
+                        .lineLimit(2...6)
+                } header: {
+                    Text("Notes")
+                }
             }
             .navigationTitle(chore == nil ? "New Chore" : "Edit Chore")
             .toolbarTitleDisplayMode(.inline)
@@ -177,6 +192,7 @@ struct ChoreEditorSheet: View {
             chore.frequency = frequency
             chore.nextDueDate = dueDate
             chore.dueWeekday = effectiveWeekday
+            chore.notes = trimmedNotes
             saved = chore
         } else {
             // Put new chores at the bottom of the list.
@@ -185,7 +201,8 @@ struct ChoreEditorSheet: View {
                 frequency: frequency,
                 sortOrder: nextSortOrder(),
                 nextDueDate: dueDate,
-                dueWeekday: effectiveWeekday
+                dueWeekday: effectiveWeekday,
+                notes: trimmedNotes
             )
             modelContext.insert(saved)
         }

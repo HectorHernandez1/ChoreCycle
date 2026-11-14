@@ -46,6 +46,10 @@ final class Chore {
     /// on that morning.
     var dueWeekday: Int?
 
+    /// Free-form details, like "filter size 16×25×1" or "use the blue
+    /// cleaner". Empty when there are none.
+    var notes: String = ""
+
     /// Every time this chore was checked off, across all weeks and months.
     ///
     /// `@Relationship` tells SwiftData this is a link to other models rather
@@ -65,7 +69,9 @@ final class Chore {
          createdAt: Date = .now,
          nextDueDate: Date? = nil,
          dueWeekday: Int? = nil,
+         notes: String = "",
          choreID: UUID = UUID()) {
+        self.notes = notes
         self.name = name
         self.frequency = frequency
         self.sortOrder = sortOrder

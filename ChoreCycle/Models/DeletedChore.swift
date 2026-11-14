@@ -14,6 +14,7 @@ struct DeletedChore {
     let createdAt: Date
     let nextDueDate: Date?
     let dueWeekday: Int?
+    let notes: String
     let completionDates: [Date]
     /// Kept so Siri shortcuts that point at this chore keep working after Undo.
     let choreID: UUID?
@@ -26,6 +27,7 @@ struct DeletedChore {
         createdAt = chore.createdAt
         nextDueDate = chore.nextDueDate
         dueWeekday = chore.dueWeekday
+        notes = chore.notes
         completionDates = chore.allCompletions.map(\.completedAt)
     }
 
@@ -38,6 +40,7 @@ struct DeletedChore {
                           createdAt: createdAt,
                           nextDueDate: nextDueDate,
                           dueWeekday: dueWeekday,
+                          notes: notes,
                           choreID: choreID ?? UUID())
         context.insert(chore)
         for date in completionDates {

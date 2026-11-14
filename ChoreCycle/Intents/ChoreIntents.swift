@@ -28,21 +28,25 @@ nonisolated struct ChoreEntity: AppEntity {
     @Property(title: "Repeats")
     var repeats: String
 
+    @Property(title: "Notes")
+    var notes: String
+
     var displayRepresentation: DisplayRepresentation {
         DisplayRepresentation(title: "\(name)", subtitle: "\(repeats)")
     }
 
-    init(id: UUID, name: String, repeats: String) {
+    init(id: UUID, name: String, repeats: String, notes: String = "") {
         self.id = id
         self.name = name
         self.repeats = repeats
+        self.notes = notes
     }
 
     /// `nil` for a chore that hasn't been given a `choreID` yet.
     @MainActor
     init?(_ chore: Chore) {
         guard let id = chore.choreID else { return nil }
-        self.init(id: id, name: chore.name, repeats: chore.frequency.title)
+        self.init(id: id, name: chore.name, repeats: chore.frequency.title, notes: chore.notes)
     }
 }
 

@@ -39,6 +39,14 @@ struct ChoreRowView: View {
                                 .foregroundStyle(isOverdue && !isDone ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
                                 .contentTransition(.numericText())
                         }
+
+                        if !chore.notes.isEmpty {
+                            Label(chore.notes, systemImage: "note.text")
+                                .labelStyle(NoteLabelStyle())
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
                     }
 
                     Spacer(minLength: 0)
@@ -97,6 +105,18 @@ struct ChoreRowView: View {
     }
 }
 
+/// A small icon in front of a chore's note, aligned to its first line.
+private struct NoteLabelStyle: LabelStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            configuration.icon
+                .imageScale(.small)
+                .accessibilityHidden(true)
+            configuration.title
+        }
+    }
+}
+
 #Preview {
     List {
         ChoreRowView(
@@ -106,7 +126,8 @@ struct ChoreRowView: View {
             onEdit: {}
         )
         ChoreRowView(
-            chore: Chore(name: "Water the plants", frequency: .weekly, sortOrder: 1),
+            chore: Chore(name: "Water the plants", frequency: .weekly, sortOrder: 1,
+                         notes: "Fern needs extra, cactus every other time"),
             isDone: true,
             onToggle: { _ in },
             onEdit: {}

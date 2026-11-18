@@ -14,6 +14,7 @@ ChoreCycle is a personal chore tracker for iPhone, iPad, and Mac, built with Swi
 - **History.** A History tab shows weekly and monthly streaks (periods where every chore got done), your best streaks, and a week-by-week log of everything checked off.
 - **Celebrations.** Confetti and haptics when you check a chore off, with a bigger burst when the whole list is done. Respects Reduce Motion.
 - **Profile.** Display name, accent color, light/dark appearance, and toggles for confetti and reminders.
+- **Big screens.** On the unfolded iPhone, iPad, or a wide Mac window, This Week and This Month sit side by side, chores are edited in a side panel, History shows its stats beside the log, and the tab bar can become a sidebar. Folding back switches to the phone layout.
 - **Accessibility.** Accent colors and warning text meet WCAG contrast minimums, every control has a VoiceOver label, and text and icons scale with Dynamic Type.
 - **iCloud sync.** Chores and check-offs sync across devices signed in to the same Apple Account through CloudKit.
 

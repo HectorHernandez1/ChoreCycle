@@ -42,6 +42,10 @@ struct ChoreListView: View {
     /// makes SwiftUI redraw the view. `now` is the reference date for
     /// deciding which week or month is "current".
     @State private var now = Date.now
+    /// The app-wide editor from `MainTabView`, which shows it as a side
+    /// panel on wide screens. `nil` when this list is shown on its own (as
+    /// in its previews), in which case the list uses its own sheets below.
+    @Environment(ChoreEditorPresenter.self) private var editor: ChoreEditorPresenter?
     @State private var isAddingChore = false
     @State private var choreBeingEdited: Chore?
     @State private var isUpcomingExpanded = false
@@ -213,7 +217,7 @@ struct ChoreListView: View {
                 #endif
                 ToolbarItem(placement: .primaryAction) {
                     Button("Add Chore", systemImage: "plus") {
-                        isAddingChore = true
+                        startAdding()
                     }
                 }
             }
@@ -252,7 +256,7 @@ struct ChoreListView: View {
                 detail: detail(for: chore),
                 isOverdue: chore.isOverdue(asOf: now),
                 onToggle: { checkCenter in toggle(chore, at: checkCenter) },
-                onEdit: { choreBeingEdited = chore },
+                onEdit: { startEditing(chore) },
                 skipAction: skipAction
             )
             // Swipe right to skip. Custom swipe actions replace the ones
@@ -303,10 +307,30 @@ struct ChoreListView: View {
         #endif
     }
 
+    /// New chores default to the frequency of this list.
+    private func startAdding() {
+        if let editor {
+            editor.add(frequency)
+        } else {
+            isAddingChore = true
+        }
+    }
+
+    private func startEditing(_ chore: Chore) {
+        if let editor {
+            editor.edit(chore)
+        } else {
+            choreBeingEdited = chore
+        }
+    }
+
     /// Deletes chores (and their history), keeping a copy so the Undo
     /// banner can put them back.
     private func delete(_ removed: [Chore]) {
         guard !removed.isEmpty else { return }
+        // The side panel leaves the list usable, so the chore being edited
+        // could be the one going away.
+        editor?.close(ifEditingAnyOf: removed)
         let undo = PendingUndo(chores: removed.map { DeletedChore($0) })
         withAnimation(.snappy) {
             pendingUndo = undo
@@ -440,7 +464,7 @@ struct ChoreListView: View {
             Text("Chores you add here reset at the start of every \(frequency == .weekly ? "week" : "month").")
         } actions: {
             Button("Add Chore", systemImage: "plus") {
-                isAddingChore = true
+                startAdding()
             }
             .buttonStyle(.borderedProminent)
         }

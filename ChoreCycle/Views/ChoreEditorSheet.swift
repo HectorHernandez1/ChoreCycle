@@ -2,10 +2,16 @@ import SwiftUI
 import SwiftData
 import AppIntents
 
-/// A sheet for adding a new chore, or editing an existing one.
+/// A form for adding a new chore, or editing an existing one. Shown as a
+/// sheet, or as a side panel (inspector) on wide screens.
 struct ChoreEditorSheet: View {
     /// The chore being edited, or `nil` when adding a new one.
     let chore: Chore?
+
+    /// How to close the editor when it isn't a plain sheet (the side panel
+    /// is closed by clearing `ChoreEditorPresenter.request`). `nil` means
+    /// use `dismiss`.
+    var onDone: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var modelContext
     @Environment(UserSettings.self) private var settings
@@ -29,8 +35,9 @@ struct ChoreEditorSheet: View {
 
     /// `defaultFrequency` picks the starting frequency for a new chore. It's
     /// ignored when editing, since an existing chore already has one.
-    init(chore: Chore? = nil, defaultFrequency: Frequency = .weekly) {
+    init(chore: Chore? = nil, defaultFrequency: Frequency = .weekly, onDone: (() -> Void)? = nil) {
         self.chore = chore
+        self.onDone = onDone
         self.name = chore?.name ?? ""
         self.frequency = chore?.frequency ?? defaultFrequency
         self.nextDueDate = chore?.nextDueDate ?? .now
@@ -154,7 +161,7 @@ struct ChoreEditorSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", role: .cancel) {
-                        dismiss()
+                        close()
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -176,7 +183,22 @@ struct ChoreEditorSheet: View {
         }
     }
 
+    private func close() {
+        if let onDone {
+            onDone()
+        } else {
+            dismiss()
+        }
+    }
+
     private func save() {
+        // In the side panel the list stays usable, so the chore may have
+        // been deleted (here or on another device) while it was open.
+        if let chore, chore.isDeleted || chore.modelContext == nil {
+            close()
+            return
+        }
+
         // Weekly and monthly chores never have a due date. Rolling chores
         // only need one until their first completion.
         let dueDate: Date? = showsNextDueDate ? Calendar.mondayFirst.startOfDay(for: nextDueDate) : nil
@@ -221,7 +243,7 @@ struct ChoreEditorSheet: View {
         }
         // Teach Siri the new or changed name for "Mark … done".
         ChoreCycleShortcuts.updateAppShortcutParameters()
-        dismiss()
+        close()
     }
 
     /// One more than the highest `sortOrder` in use.

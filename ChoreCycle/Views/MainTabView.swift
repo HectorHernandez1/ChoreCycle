@@ -26,6 +26,16 @@ struct MainTabView: View {
     /// Monthly, never Checklists), so folding returns to the right one.
     @State private var selection: AppTab = .weekly
 
+    /// The one chore editor for the whole app; see `ChoreEditorPresenter`.
+    @State private var editor: ChoreEditorPresenter
+
+    init(initialEditorRequest: ChoreEditorRequest? = nil) {
+        // Previews pass a request to show the editor already open.
+        let editor = ChoreEditorPresenter()
+        editor.request = initialEditorRequest
+        _editor = State(initialValue: editor)
+    }
+
     private var isWide: Bool {
         horizontalSizeClass == .regular
     }
@@ -45,6 +55,32 @@ struct MainTabView: View {
             } else {
                 selection = newValue
             }
+        }
+    }
+
+    private var isEditorPresented: Binding<Bool> {
+        Binding {
+            editor.request != nil
+        } set: { isPresented in
+            if !isPresented {
+                editor.request = nil
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func editorView(for request: ChoreEditorRequest) -> some View {
+        let close = { editor.request = nil }
+        switch request {
+        case .new(let frequency):
+            ChoreEditorSheet(defaultFrequency: frequency, onDone: close)
+                .id(request.id)
+        case .edit(let chore):
+            // `.id` gives each chore a fresh editor, so switching from one
+            // chore to another reloads the form instead of keeping the
+            // first chore's drafts.
+            ChoreEditorSheet(chore: chore, onDone: close)
+                .id(request.id)
         }
     }
 
@@ -73,6 +109,17 @@ struct MainTabView: View {
         // iPhone, a Mac window) the tabs can become a sidebar. SwiftUI
         // switches between the two as the window changes size.
         .tabViewStyle(.sidebarAdaptable)
+        // The chore editor. On a wide screen an inspector is a panel along
+        // the right edge, so the lists stay visible (and usable) while you
+        // edit; on a narrow one SwiftUI shows the same inspector as a
+        // sheet. Either way it survives folding and unfolding.
+        .inspector(isPresented: isEditorPresented) {
+            if let request = editor.request {
+                editorView(for: request)
+                    .inspectorColumnWidth(min: 300, ideal: 340, max: 420)
+            }
+        }
+        .environment(editor)
         // The chosen accent drives check circles, the progress ring, and
         // buttons everywhere below this point.
         .tint(settings.accentTheme.color)
@@ -100,4 +147,8 @@ struct MainTabView: View {
 
 #Preview(traits: .sampleData) {
     MainTabView()
+}
+
+#Preview("Adding a chore", traits: .sampleData) {
+    MainTabView(initialEditorRequest: .new(.weekly))
 }

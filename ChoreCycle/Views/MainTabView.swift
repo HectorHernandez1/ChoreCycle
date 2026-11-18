@@ -24,6 +24,10 @@ struct MainTabView: View {
                 ProfileView()
             }
         }
+        // A tab bar on narrow screens; on wide ones (iPad, the unfolded
+        // iPhone, a Mac window) the tabs can become a sidebar. SwiftUI
+        // switches between the two as the window changes size.
+        .tabViewStyle(.sidebarAdaptable)
         // The chosen accent drives check circles, the progress ring, and
         // buttons everywhere below this point.
         .tint(settings.accentTheme.color)
